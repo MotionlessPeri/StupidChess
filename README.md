@@ -23,10 +23,24 @@ tools/             # 构建/测试工具脚本
 3. `docs/Architecture.md`
 4. `docs/InterfaceSpec.md`
 5. `docs/DependencyPolicy.md`
-6. `docs/ADR/0001-Repo-Strategy.md`
+6. `docs/CommitConvention.md`
+7. `docs/ADR/0001-Repo-Strategy.md`
 
 ## 当前技术基线
 
 1. 语言标准：`C++20`
 2. 命名风格：UE 风格（大驼峰，布尔 `b` 前缀）
 3. 服务端权威判定，客户端做展示与输入
+4. 依赖管理：`vcpkg` manifest（`vcpkg.json`）
+
+## 构建与测试
+
+示例（Windows PowerShell）：
+
+```powershell
+$VcpkgRoot = "D:\\path\\to\\vcpkg"
+cmake -S . -B build `
+  -DCMAKE_TOOLCHAIN_FILE="$VcpkgRoot\\scripts\\buildsystems\\vcpkg.cmake"
+cmake --build build --config Debug
+ctest --test-dir build -C Debug --output-on-failure
+```

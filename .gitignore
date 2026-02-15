@@ -1,4 +1,5 @@
-﻿build/
+build/
+build-*/
 out/
 .vs/
 .idea/
@@ -7,3 +8,4 @@ out/
 *.user
 *.userosscache
 *.sln.docstates
+prompt.md

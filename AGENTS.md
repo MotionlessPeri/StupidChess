@@ -9,7 +9,8 @@
 3. `docs/Architecture.md`
 4. `docs/InterfaceSpec.md`
 5. `docs/DependencyPolicy.md`
-6. `docs/ADR/0001-Repo-Strategy.md`
+6. `docs/CommitConvention.md`
+7. `docs/ADR/0001-Repo-Strategy.md`
 
 冲突处理：
 
@@ -36,3 +37,4 @@
 1. 新增规则或协议字段时，必须同步更新 `docs/RuleSpec.md` 与 `docs/InterfaceSpec.md`。
 2. 任何跨端行为变化都要补充 ADR，或在现有 ADR 追加 `Decision Update`。
 3. 提交前至少执行核心规则单测与一个回放一致性用例。
+4. 每次代码改动都要同步更新相关文档（至少包括受影响模块的设计/规范/依赖说明）。
