@@ -1,0 +1,9 @@
+﻿build/
+out/
+.vs/
+.idea/
+*.VC.db
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
