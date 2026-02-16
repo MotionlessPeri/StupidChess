@@ -35,12 +35,28 @@ tools/             # 构建/测试工具脚本
 
 ## 构建与测试
 
-示例（Windows PowerShell）：
+推荐方式（`CMakePresets.json`）：
+
+```powershell
+cmake --preset vcpkg-debug
+cmake --build --preset vcpkg-debug-build
+ctest --preset vcpkg-debug-test
+```
+
+说明：
+
+1. 预设默认通过 `$env{VCPKG_ROOT}` 解析 vcpkg toolchain。
+2. 如果只想编译不跑测试，可用：
+   - `cmake --preset vcpkg-debug-no-tests`
+   - `cmake --build --preset vcpkg-debug-no-tests-build`
+
+手动方式（Windows PowerShell）：
 
 ```powershell
 $VcpkgRoot = "D:\\path\\to\\vcpkg"
 cmake -S . -B build `
-  -DCMAKE_TOOLCHAIN_FILE="$VcpkgRoot\\scripts\\buildsystems\\vcpkg.cmake"
+  -DCMAKE_TOOLCHAIN_FILE="$VcpkgRoot\\scripts\\buildsystems\\vcpkg.cmake" `
+  -DVCPKG_MANIFEST_FEATURES=tests
 cmake --build build --config Debug
 ctest --test-dir build -C Debug --output-on-failure
 ```

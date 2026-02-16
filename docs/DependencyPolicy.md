@@ -27,6 +27,9 @@
 1. 依赖管理器采用 `vcpkg`（manifest 模式）。
 2. 测试框架采用 `gtest`，并通过 `vcpkg` 提供依赖。
 3. `CTest` 作为统一测试入口，实际测试实现使用 `gtest`。
+4. 构建参数统一通过 `CMakePresets.json` 管理，避免绕过 toolchain 约束。
+5. `vcpkg.json` 必须固定 `builtin-baseline`，避免不同 vcpkg 实例解析到不一致的 ports 版本。
+6. 测试依赖通过 manifest feature（`tests`）启用，避免无测试构建下载不必要依赖。
 
 ## 记录要求
 

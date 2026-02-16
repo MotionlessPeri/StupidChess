@@ -1,0 +1,73 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vcpkg-base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      }
+    },
+    {
+      "name": "vcpkg-debug",
+      "displayName": "vcpkg Debug (VS2022)",
+      "description": "Configure with vcpkg toolchain and tests enabled.",
+      "inherits": "vcpkg-base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64"
+      },
+      "cacheVariables": {
+        "VCPKG_MANIFEST_FEATURES": "tests",
+        "STUPIDCHESS_BUILD_TESTS": "ON",
+        "STUPIDCHESS_BUILD_SERVER": "ON"
+      }
+    },
+    {
+      "name": "vcpkg-debug-no-tests",
+      "displayName": "vcpkg Debug No Tests (VS2022)",
+      "description": "Configure with vcpkg toolchain and tests disabled.",
+      "inherits": "vcpkg-base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64"
+      },
+      "cacheVariables": {
+        "VCPKG_MANIFEST_FEATURES": "",
+        "STUPIDCHESS_BUILD_TESTS": "OFF",
+        "STUPIDCHESS_BUILD_SERVER": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vcpkg-debug-build",
+      "displayName": "Build Debug (vcpkg)",
+      "configurePreset": "vcpkg-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vcpkg-debug-no-tests-build",
+      "displayName": "Build Debug No Tests (vcpkg)",
+      "configurePreset": "vcpkg-debug-no-tests",
+      "configuration": "Debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "vcpkg-debug-test",
+      "displayName": "CTest Debug (vcpkg)",
+      "configurePreset": "vcpkg-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

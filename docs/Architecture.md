@@ -42,6 +42,7 @@
    - 阶段 1：薄客户端，服务端权威。
    - 阶段 2：WASM 本地预演与提示。
 5. 第三方依赖通过 `vcpkg` manifest（`vcpkg.json`）统一管理。
+6. 默认构建入口使用 `CMakePresets.json`，避免 IDE 与命令行的 toolchain 参数漂移。
 
 ## 4. 版本策略
 

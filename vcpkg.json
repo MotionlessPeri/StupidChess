@@ -1,7 +1,14 @@
 {
   "name": "stupidchess",
   "version-string": "0.1.0",
-  "dependencies": [
-    "gtest"
-  ]
+  "builtin-baseline": "e5a1490e1409d175932ef6014519e9ae149ddb7c",
+  "dependencies": [],
+  "features": {
+    "tests": {
+      "description": "Dependencies required to build and run test targets.",
+      "dependencies": [
+        "gtest"
+      ]
+    }
+  }
 }
