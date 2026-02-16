@@ -254,6 +254,12 @@ struct FStupidChessGameOverView
 
     UPROPERTY(BlueprintReadOnly, Category = "StupidChess|Server")
     int64 TurnIndex = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category = "StupidChess|Server")
+    bool bIsDraw = false;
+
+    UPROPERTY(BlueprintReadOnly, Category = "StupidChess|Server")
+    int32 WinnerSide = -1;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessJoinAckParsedDelegate, const FStupidChessJoinAckView&, JoinAck);

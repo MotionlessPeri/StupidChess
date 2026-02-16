@@ -38,6 +38,11 @@ UE 客户端实现目录。
 19. `TryParseJoinAckMessage` / `TryParseCommandAckMessage` / `TryParseErrorMessage`：按消息类型安全解析 outbox 确认与错误消息。
 20. `TryParseSnapshotMessage` / `TryParseEventDeltaMessage` / `TryParseGameOverMessage`：按消息类型安全解析 outbox 状态同步与终局消息。
 
+`FStupidChessGameOverView` 除终局基础字段外，额外提供 UI 友好字段：
+
+1. `bIsDraw`：是否和局。
+2. `WinnerSide`：赢家阵营（`Red/Black`，无赢家时为 `-1`）。
+
 ### Event Dispatch
 
 `UStupidChessLocalMatchSubsystem` 暴露以下 `BlueprintAssignable` 事件，供 UI/流程图直接订阅：
@@ -56,5 +61,5 @@ UE 客户端实现目录。
 1. `StupidChess.UE.CoreBridge.LocalFlow`：覆盖本地链路 `Join -> Commit/Reveal -> Move -> Resign -> AckError`，并验证 `TryParse* + ParsedCache` 结构化解析接口。
 2. `StupidChess.UE.CoreBridge.ErrorPaths`：覆盖非法命令/非法 payload 路径（本地校验拒绝、服务端拒绝、JSON 解码失败），并验证错误消息缓存解析。
 3. 运行方式（UE 5.7 示例）：
-   - `UnrealEditor-Cmd.exe StupidChessUE.uproject -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow; Quit" -unattended -nop4 -nosplash -NullRHI`
-   - `UnrealEditor-Cmd.exe StupidChessUE.uproject -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.ErrorPaths; Quit" -unattended -nop4 -nosplash -NullRHI`
+   - `UnrealEditor-Cmd.exe StupidChessUE.uproject -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow; Quit" -unattended -nop4 -nosplash -NullRHI -culture=en`
+   - `UnrealEditor-Cmd.exe StupidChessUE.uproject -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.ErrorPaths; Quit" -unattended -nop4 -nosplash -NullRHI -culture=en`

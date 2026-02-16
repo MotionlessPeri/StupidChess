@@ -238,6 +238,10 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Game-over end reason should be resign."),
                   GameOver.EndReason,
                   static_cast<int32>(EEndReason::Resign));
+        TestFalse(TEXT("Game-over should not be draw on resign."), GameOver.bIsDraw);
+        TestEqual(TEXT("Game-over winner side should be red."),
+                  GameOver.WinnerSide,
+                  static_cast<int32>(ESide::Red));
     }
 
     FStupidChessGameOverView CachedGameOver{};
@@ -246,6 +250,10 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Cached game-over result should be red win after black resign."),
               CachedGameOver.Result,
               static_cast<int32>(EGameResult::RedWin));
+    TestFalse(TEXT("Cached game-over should not be draw on resign."), CachedGameOver.bIsDraw);
+    TestEqual(TEXT("Cached game-over winner side should be red."),
+              CachedGameOver.WinnerSide,
+              static_cast<int32>(ESide::Red));
 
     Subsystem->ClearOutboundMessages();
 

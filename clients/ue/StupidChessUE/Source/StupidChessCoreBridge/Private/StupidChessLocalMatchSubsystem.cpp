@@ -1,5 +1,6 @@
 #include "StupidChessLocalMatchSubsystem.h"
 
+#include "CoreRules/CoreTypes.h"
 #include "Protocol/ProtocolCodec.h"
 #include "Protocol/ProtocolTypes.h"
 #include "Server/MatchService.h"
@@ -637,6 +638,19 @@ bool UStupidChessLocalMatchSubsystem::DecodeGameOverPayloadJson(const FString& P
     OutGameOver.Result = DecodedPayload.Result;
     OutGameOver.EndReason = DecodedPayload.EndReason;
     OutGameOver.TurnIndex = static_cast<int64>(DecodedPayload.TurnIndex);
+    OutGameOver.bIsDraw = DecodedPayload.Result == static_cast<int32>(EGameResult::Draw);
+    if (DecodedPayload.Result == static_cast<int32>(EGameResult::RedWin))
+    {
+        OutGameOver.WinnerSide = static_cast<int32>(ESide::Red);
+    }
+    else if (DecodedPayload.Result == static_cast<int32>(EGameResult::BlackWin))
+    {
+        OutGameOver.WinnerSide = static_cast<int32>(ESide::Black);
+    }
+    else
+    {
+        OutGameOver.WinnerSide = -1;
+    }
     return true;
 }
 

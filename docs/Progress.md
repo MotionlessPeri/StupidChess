@@ -63,6 +63,9 @@
     - `protocol/server` 新增 `FProtocolGameOverPayload` 与 `S2C_GameOver` 编解码/下发链路。
     - `UStupidChessLocalMatchSubsystem` 新增 `GameOver` 结构化解码、缓存读取与 `OnGameOverParsed` 派发事件。
     - `ServerGateway/UE` 自动化测试新增 `S2C_GameOver` 断言，覆盖认输终局路径。
+24. UE 终局视图易用性增强：
+    - `FStupidChessGameOverView` 新增 `bIsDraw` 与 `WinnerSide`，减少蓝图层重复判定逻辑。
+    - `DecodeGameOverPayloadJson` 自动映射赢家阵营与和局标志，缓存读取与自动化断言同步覆盖。
 
 ## In Progress
 
@@ -76,7 +79,7 @@
 
 ## Test Baseline
 
-1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（37/37）。
+1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（39/39）。
 2. `Build.bat StupidChessUEEditor Win64 Development ...` 当前编译通过（UE 5.7）。
-3. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow;Quit"` 当前通过（EXIT CODE: 0）。
-4. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.ErrorPaths;Quit"` 当前通过（EXIT CODE: 0）。
+3. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow;Quit" -culture=en` 当前通过（EXIT CODE: 0）。
+4. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.ErrorPaths;Quit" -culture=en` 当前通过（EXIT CODE: 0）。
