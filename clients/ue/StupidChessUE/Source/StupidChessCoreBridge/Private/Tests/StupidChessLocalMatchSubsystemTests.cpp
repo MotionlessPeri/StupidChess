@@ -210,4 +210,94 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FStupidChessLocalMatchSubsystemErrorPathsTest,
+    "StupidChess.UE.CoreBridge.ErrorPaths",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Parameters)
+{
+    (void)Parameters;
+
+    constexpr int64 MatchId = 901;
+    constexpr int64 PlayerId = 11001;
+
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    TestNotNull(TEXT("GameInstance should be created for subsystem outer."), GameInstance);
+    if (GameInstance == nullptr)
+    {
+        return false;
+    }
+
+    UStupidChessLocalMatchSubsystem* Subsystem = NewObject<UStupidChessLocalMatchSubsystem>(GameInstance);
+    TestNotNull(TEXT("Subsystem should be created."), Subsystem);
+    if (Subsystem == nullptr)
+    {
+        return false;
+    }
+
+    Subsystem->ResetLocalServer();
+    TestTrue(TEXT("Player should join local match."), Subsystem->JoinLocalMatch(MatchId, PlayerId));
+    Subsystem->ClearOutboundMessages();
+
+    FStupidChessMoveCommand InvalidMove{};
+    InvalidMove.PieceId = 70000; // Overflow for protocol piece id
+    InvalidMove.FromX = 0;
+    InvalidMove.FromY = 3;
+    InvalidMove.ToX = 0;
+    InvalidMove.ToY = 4;
+
+    TestFalse(TEXT("Move with invalid piece id should be rejected by local validation."),
+              Subsystem->SubmitMove(MatchId, PlayerId, EStupidChessSide::Red, InvalidMove));
+    TestEqual(TEXT("Invalid local move should not emit any outbound message."),
+              Subsystem->PullOutboundMessages(PlayerId).Num(),
+              0);
+
+    TArray<FStupidChessSetupPlacement> InvalidPlacements = BuildStandardSetup(EStupidChessSide::Red);
+    InvalidPlacements[0].PieceId = 70000;
+    TestFalse(TEXT("Reveal with invalid placement piece id should be rejected by local validation."),
+              Subsystem->SubmitRevealSetup(MatchId, PlayerId, EStupidChessSide::Red, TEXT("R"), InvalidPlacements));
+    TestEqual(TEXT("Invalid local reveal should not emit any outbound message."),
+              Subsystem->PullOutboundMessages(PlayerId).Num(),
+              0);
+
+    TestFalse(TEXT("Pass in setup phase should be rejected by server."),
+              Subsystem->SubmitPass(MatchId, PlayerId, EStupidChessSide::Red));
+    const TArray<FStupidChessOutboundMessage> SetupPhasePassMessages = Subsystem->PullOutboundMessages(PlayerId);
+    const FStupidChessOutboundMessage* SetupPhasePassAck = FindFirstMessageByType(
+        SetupPhasePassMessages,
+        EStupidChessProtocolMessageType::S2C_CommandAck);
+    TestNotNull(TEXT("Rejected pass should still emit command ack."), SetupPhasePassAck);
+    if (SetupPhasePassAck != nullptr)
+    {
+        FStupidChessCommandAckView CommandAck{};
+        TestTrue(TEXT("Rejected command ack should parse."), Subsystem->TryParseCommandAckMessage(*SetupPhasePassAck, CommandAck));
+        TestFalse(TEXT("Rejected pass ack should be not accepted."), CommandAck.bAccepted);
+        TestFalse(TEXT("Rejected pass ack should carry an error code."), CommandAck.ErrorCode.IsEmpty());
+    }
+
+    FStupidChessJoinAckView JoinAckView{};
+    TestFalse(TEXT("Malformed JoinAck JSON should fail to decode."),
+              Subsystem->DecodeJoinAckPayloadJson(TEXT("{broken json"), JoinAckView));
+    FStupidChessCommandAckView CommandAckView{};
+    TestFalse(TEXT("Malformed CommandAck JSON should fail to decode."),
+              Subsystem->DecodeCommandAckPayloadJson(TEXT("{broken json"), CommandAckView));
+    FStupidChessErrorView ErrorView{};
+    TestFalse(TEXT("Malformed Error JSON should fail to decode."),
+              Subsystem->DecodeErrorPayloadJson(TEXT("{broken json"), ErrorView));
+
+    FStupidChessOutboundMessage WrongTypeMessage{};
+    WrongTypeMessage.MessageType = EStupidChessProtocolMessageType::S2C_Snapshot;
+    WrongTypeMessage.PayloadJson = TEXT("{}");
+    TestFalse(TEXT("TryParseJoinAckMessage should reject non-join-ack message."),
+              Subsystem->TryParseJoinAckMessage(WrongTypeMessage, JoinAckView));
+    TestFalse(TEXT("TryParseCommandAckMessage should reject non-command-ack message."),
+              Subsystem->TryParseCommandAckMessage(WrongTypeMessage, CommandAckView));
+    TestFalse(TEXT("TryParseErrorMessage should reject non-error message."),
+              Subsystem->TryParseErrorMessage(WrongTypeMessage, ErrorView));
+
+    Subsystem->Deinitialize();
+    return true;
+}
+
 #endif

@@ -48,6 +48,9 @@
 19. UE bridge 自动化冒烟测试：
     - 新增 `StupidChess.UE.CoreBridge.LocalFlow` 自动化用例。
     - 覆盖 `Join -> Commit/Reveal -> Move -> Resign -> AckError` 全链路与 `TryParse*` 解析断言。
+20. UE bridge 错误路径自动化测试：
+    - 新增 `StupidChess.UE.CoreBridge.ErrorPaths` 自动化用例。
+    - 覆盖本地参数校验拒绝、服务端拒绝命令、以及 JSON 解码失败路径。
 
 ## In Progress
 
@@ -55,8 +58,8 @@
 
 ## Next Steps
 
-1. 增加第二条 UE bridge 用例：覆盖非法命令/非法 payload 的错误路径与错误码口径。
-2. 评估是否将结构化解析结果直接缓存为 subsystem 内部可订阅状态。
+1. 评估是否将结构化解析结果直接缓存为 subsystem 内部可订阅状态。
+2. 评估在 UE bridge 侧引入消息派发/订阅接口（减少上层轮询 outbox）。
 3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 
 ## Test Baseline
@@ -64,3 +67,4 @@
 1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（37/37）。
 2. `Build.bat StupidChessUEEditor Win64 Development ...` 当前编译通过（UE 5.7）。
 3. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow;Quit"` 当前通过（EXIT CODE: 0）。
+4. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.ErrorPaths;Quit"` 当前通过（EXIT CODE: 0）。
