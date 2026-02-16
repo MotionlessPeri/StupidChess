@@ -475,6 +475,7 @@ struct FOutboundProtocolMessage
     std::optional<FProtocolCommandAckPayload> CommandAck;
     std::optional<FProtocolSnapshotPayload> Snapshot;
     std::optional<FProtocolEventDeltaPayload> EventDelta;
+    std::optional<FProtocolGameOverPayload> GameOver;
     std::string ErrorMessage;
 };
 
@@ -656,6 +657,13 @@ struct FProtocolEventDeltaPayload
     std::vector<FProtocolEventRecordPayload> Events;
 };
 
+struct FProtocolGameOverPayload
+{
+    int32_t Result = 0;
+    int32_t EndReason = 0;
+    uint64_t TurnIndex = 0;
+};
+
 struct FProtocolErrorPayload
 {
     std::string ErrorMessage;
@@ -670,6 +678,7 @@ public:
     virtual FProtocolCommandAckPayload BuildCommandAckPayload(const FCommandResult& CommandResult) const = 0;
     virtual FProtocolSnapshotPayload BuildSnapshotPayload(const FMatchPlayerView& View, uint64_t LastEventSequence) const = 0;
     virtual FProtocolEventDeltaPayload BuildEventDeltaPayload(const FMatchSyncResponse& SyncResponse) const = 0;
+    virtual FProtocolGameOverPayload BuildGameOverPayload(const FMatchPlayerView& View) const = 0;
 };
 
 class IProtocolCodec
@@ -687,6 +696,8 @@ public:
     virtual bool DecodePullSyncPayload(const std::string& Json, FProtocolPullSyncPayload& OutPayload) const = 0;
     virtual bool EncodeAckPayload(const FProtocolAckPayload& Payload, std::string& OutJson) const = 0;
     virtual bool DecodeAckPayload(const std::string& Json, FProtocolAckPayload& OutPayload) const = 0;
+    virtual bool EncodeGameOverPayload(const FProtocolGameOverPayload& Payload, std::string& OutJson) const = 0;
+    virtual bool DecodeGameOverPayload(const std::string& Json, FProtocolGameOverPayload& OutPayload) const = 0;
 };
 ```
 
@@ -696,6 +707,7 @@ public:
 2. `S2C_EventDelta` 带 `Sequence`（以及事件内 `TurnIndex`），客户端可断线续拉。
 3. 客户端永不上传“规则结论”，只上传命令意图。
 4. 客户端通过 `C2S_PullSync` 与 `C2S_Ack` 驱动断线重连补发与已处理游标推进。
+5. 当局面进入 `GameOver` 时，服务端除 `Snapshot + EventDelta` 外，额外下发 `S2C_GameOver` 作为终局事件信号。
 
 ## 12. UE 适配层接口（UEAdapter）
 

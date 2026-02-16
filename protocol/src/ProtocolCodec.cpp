@@ -996,6 +996,41 @@ bool DecodeEventDeltaPayload(const std::string& Json, FProtocolEventDeltaPayload
     return true;
 }
 
+bool EncodeGameOverPayload(const FProtocolGameOverPayload& Payload, std::string& OutJson)
+{
+    std::ostringstream Stream;
+    Stream << "{\"result\":" << Payload.Result
+           << ",\"endReason\":" << Payload.EndReason
+           << ",\"turnIndex\":" << Payload.TurnIndex
+           << '}';
+    OutJson = Stream.str();
+    return true;
+}
+
+bool DecodeGameOverPayload(const std::string& Json, FProtocolGameOverPayload& OutPayload)
+{
+    FProtocolJsonValue Root;
+    if (!ParseJsonRootObject(Json, Root))
+    {
+        return false;
+    }
+
+    int64_t Result = 0;
+    int64_t EndReason = 0;
+    int64_t TurnIndex = 0;
+    if (!ReadInt(Root, "result", Result) ||
+        !ReadInt(Root, "endReason", EndReason) ||
+        !ReadInt(Root, "turnIndex", TurnIndex))
+    {
+        return false;
+    }
+
+    OutPayload.Result = static_cast<int32_t>(Result);
+    OutPayload.EndReason = static_cast<int32_t>(EndReason);
+    OutPayload.TurnIndex = static_cast<uint64_t>(TurnIndex);
+    return true;
+}
+
 bool EncodeErrorPayload(const FProtocolErrorPayload& Payload, std::string& OutJson)
 {
     std::ostringstream Stream;

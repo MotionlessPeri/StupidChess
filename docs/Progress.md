@@ -59,6 +59,10 @@
     - 新增 `BlueprintAssignable` 事件：`OnJoinAckParsed/OnCommandAckParsed/OnErrorParsed/OnSnapshotParsed/OnEventDeltaParsed`。
     - 新增 `GetLastPulledMessages/GetLastPulledMessageCount`，便于表现层在事件回调后读取原始批次。
     - 自动化用例迁移到新入口，覆盖 `Join/Move/InvalidAck` 路径。
+23. 终局协议与 UE 接入补齐：
+    - `protocol/server` 新增 `FProtocolGameOverPayload` 与 `S2C_GameOver` 编解码/下发链路。
+    - `UStupidChessLocalMatchSubsystem` 新增 `GameOver` 结构化解码、缓存读取与 `OnGameOverParsed` 派发事件。
+    - `ServerGateway/UE` 自动化测试新增 `S2C_GameOver` 断言，覆盖认输终局路径。
 
 ## In Progress
 
@@ -67,7 +71,7 @@
 ## Next Steps
 
 1. 在 UE 工程内创建最小蓝图样例（加入房间、提交命令、订阅 `On*Parsed` 更新文本/棋盘状态）。
-2. 为 `GameOver` 增加结构化视图与解析/派发支持，补齐当前 `S2C_GameOver` 空白路径。
+2. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
 3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 
 ## Test Baseline

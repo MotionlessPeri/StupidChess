@@ -151,6 +151,13 @@ struct FProtocolEventDeltaPayload
     std::vector<FProtocolEventRecordPayload> Events;
 };
 
+struct FProtocolGameOverPayload
+{
+    int32_t Result = 0;
+    int32_t EndReason = 0;
+    uint64_t TurnIndex = 0;
+};
+
 struct FProtocolErrorPayload
 {
     std::string ErrorMessage;

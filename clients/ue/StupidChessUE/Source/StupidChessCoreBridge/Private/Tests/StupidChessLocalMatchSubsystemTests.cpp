@@ -206,11 +206,18 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
 
     TestTrue(TEXT("Black resign should be accepted."),
              Subsystem->SubmitResign(MatchId, BlackPlayerId, EStupidChessSide::Black));
-    const TArray<FStupidChessOutboundMessage> RedResignMessages = Subsystem->PullOutboundMessages(RedPlayerId);
+    TestEqual(TEXT("Resign pull-parse-dispatch should parse three messages."),
+              Subsystem->PullParseAndDispatchOutboundMessages(RedPlayerId),
+              3);
+    const TArray<FStupidChessOutboundMessage> RedResignMessages = Subsystem->GetLastPulledMessages();
     const FStupidChessOutboundMessage* RedResignSnapshotMessage = FindFirstMessageByType(
         RedResignMessages,
         EStupidChessProtocolMessageType::S2C_Snapshot);
+    const FStupidChessOutboundMessage* RedResignGameOverMessage = FindFirstMessageByType(
+        RedResignMessages,
+        EStupidChessProtocolMessageType::S2C_GameOver);
     TestNotNull(TEXT("Resign should emit snapshot to red."), RedResignSnapshotMessage);
+    TestNotNull(TEXT("Resign should emit game-over to red."), RedResignGameOverMessage);
 
     if (RedResignSnapshotMessage != nullptr)
     {
@@ -220,6 +227,25 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("End reason should be resign."), Snapshot.EndReason, static_cast<int32>(EEndReason::Resign));
         TestEqual(TEXT("Phase should be game over."), Snapshot.Phase, static_cast<int32>(EGamePhase::GameOver));
     }
+
+    if (RedResignGameOverMessage != nullptr)
+    {
+        FStupidChessGameOverView GameOver{};
+        TestTrue(TEXT("Resign game-over should parse."), Subsystem->TryParseGameOverMessage(*RedResignGameOverMessage, GameOver));
+        TestEqual(TEXT("Game-over result should be red win after black resign."),
+                  GameOver.Result,
+                  static_cast<int32>(EGameResult::RedWin));
+        TestEqual(TEXT("Game-over end reason should be resign."),
+                  GameOver.EndReason,
+                  static_cast<int32>(EEndReason::Resign));
+    }
+
+    FStupidChessGameOverView CachedGameOver{};
+    TestTrue(TEXT("Cached game-over should be available after resign."),
+             Subsystem->GetCachedGameOver(CachedGameOver));
+    TestEqual(TEXT("Cached game-over result should be red win after black resign."),
+              CachedGameOver.Result,
+              static_cast<int32>(EGameResult::RedWin));
 
     Subsystem->ClearOutboundMessages();
 
@@ -341,6 +367,9 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
               Subsystem->TryParseCommandAckMessage(WrongTypeMessage, CommandAckView));
     TestFalse(TEXT("TryParseErrorMessage should reject non-error message."),
               Subsystem->TryParseErrorMessage(WrongTypeMessage, ErrorView));
+    FStupidChessGameOverView GameOverView{};
+    TestFalse(TEXT("TryParseGameOverMessage should reject non-game-over message."),
+              Subsystem->TryParseGameOverMessage(WrongTypeMessage, GameOverView));
 
     Subsystem->ClearOutboundMessages();
     TestFalse(TEXT("Invalid ack should be rejected and emit error."),

@@ -14,10 +14,11 @@
    - 支持 `AckPlayerEvents` 游标确认与 `PullPlayerSync` 断线重连增量恢复。
 3. `FProtocolMapper`
    - 将 `MatchService/MatchSession` 内部模型映射为 `protocol` DTO。
-   - 统一 `JoinAck/CommandAck/Snapshot/EventDelta` 的字段口径。
+   - 统一 `JoinAck/CommandAck/Snapshot/EventDelta/GameOver` 的字段口径。
 4. `FServerTransportAdapter`
    - 处理 Join/Command/PullSync/Ack 请求入口。
-   - 统一下发 `S2C_JoinAck/S2C_CommandAck/S2C_Snapshot/S2C_EventDelta/S2C_Error`。
+   - 统一下发 `S2C_JoinAck/S2C_CommandAck/S2C_Snapshot/S2C_EventDelta/S2C_GameOver/S2C_Error`。
+   - 当局面进入 `GameOver` 时，在同步消息后追加 `S2C_GameOver`。
    - `FInMemoryServerMessageSink` 提供测试与本地验证用 outbox。
 5. `FServerGateway`
    - 接收 `ProtocolEnvelope`（或 JSON），解码 `C2S` payload 并路由到 transport adapter。

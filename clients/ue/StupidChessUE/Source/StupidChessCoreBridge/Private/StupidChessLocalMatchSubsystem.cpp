@@ -337,11 +337,13 @@ void UStupidChessLocalMatchSubsystem::ResetParsedCache()
     bHasCachedError = false;
     bHasCachedSnapshot = false;
     bHasCachedEventDelta = false;
+    bHasCachedGameOver = false;
     CachedJoinAck = FStupidChessJoinAckView{};
     CachedCommandAck = FStupidChessCommandAckView{};
     CachedError = FStupidChessErrorView{};
     CachedSnapshot = FStupidChessSnapshotView{};
     CachedEventDelta = FStupidChessEventDeltaView{};
+    CachedGameOver = FStupidChessGameOverView{};
 }
 
 int32 UStupidChessLocalMatchSubsystem::ParseOutboundMessagesToCache(const TArray<FStupidChessOutboundMessage>& Messages)
@@ -403,6 +405,17 @@ int32 UStupidChessLocalMatchSubsystem::ParseOutboundMessagesToCache(const TArray
             {
                 CachedEventDelta = MoveTemp(ParsedEventDelta);
                 bHasCachedEventDelta = true;
+                ++ParsedCount;
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_GameOver:
+        {
+            FStupidChessGameOverView ParsedGameOver{};
+            if (TryParseGameOverMessage(Message, ParsedGameOver))
+            {
+                CachedGameOver = MoveTemp(ParsedGameOver);
+                bHasCachedGameOver = true;
                 ++ParsedCount;
             }
             break;
@@ -472,6 +485,15 @@ int32 UStupidChessLocalMatchSubsystem::PullParseAndDispatchOutboundMessages(int6
             if (TryParseEventDeltaMessage(Message, ParsedEventDelta))
             {
                 OnEventDeltaParsed.Broadcast(ParsedEventDelta);
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_GameOver:
+        {
+            FStupidChessGameOverView ParsedGameOver{};
+            if (TryParseGameOverMessage(Message, ParsedGameOver))
+            {
+                OnGameOverParsed.Broadcast(ParsedGameOver);
             }
             break;
         }
@@ -603,6 +625,21 @@ bool UStupidChessLocalMatchSubsystem::DecodeEventDeltaPayloadJson(const FString&
     return true;
 }
 
+bool UStupidChessLocalMatchSubsystem::DecodeGameOverPayloadJson(const FString& PayloadJson, FStupidChessGameOverView& OutGameOver) const
+{
+    FProtocolGameOverPayload DecodedPayload{};
+    const std::string JsonUtf8 = TCHAR_TO_UTF8(*PayloadJson);
+    if (!ProtocolCodec::DecodeGameOverPayload(JsonUtf8, DecodedPayload))
+    {
+        return false;
+    }
+
+    OutGameOver.Result = DecodedPayload.Result;
+    OutGameOver.EndReason = DecodedPayload.EndReason;
+    OutGameOver.TurnIndex = static_cast<int64>(DecodedPayload.TurnIndex);
+    return true;
+}
+
 bool UStupidChessLocalMatchSubsystem::TryParseSnapshotMessage(const FStupidChessOutboundMessage& Message, FStupidChessSnapshotView& OutSnapshot) const
 {
     if (Message.MessageType != EStupidChessProtocolMessageType::S2C_Snapshot)
@@ -651,6 +688,16 @@ bool UStupidChessLocalMatchSubsystem::TryParseErrorMessage(const FStupidChessOut
     }
 
     return DecodeErrorPayloadJson(Message.PayloadJson, OutError);
+}
+
+bool UStupidChessLocalMatchSubsystem::TryParseGameOverMessage(const FStupidChessOutboundMessage& Message, FStupidChessGameOverView& OutGameOver) const
+{
+    if (Message.MessageType != EStupidChessProtocolMessageType::S2C_GameOver)
+    {
+        return false;
+    }
+
+    return DecodeGameOverPayloadJson(Message.PayloadJson, OutGameOver);
 }
 
 bool UStupidChessLocalMatchSubsystem::GetCachedJoinAck(FStupidChessJoinAckView& OutJoinAck) const
@@ -705,6 +752,17 @@ bool UStupidChessLocalMatchSubsystem::GetCachedEventDelta(FStupidChessEventDelta
     }
 
     OutEventDelta = CachedEventDelta;
+    return true;
+}
+
+bool UStupidChessLocalMatchSubsystem::GetCachedGameOver(FStupidChessGameOverView& OutGameOver) const
+{
+    if (!bHasCachedGameOver)
+    {
+        return false;
+    }
+
+    OutGameOver = CachedGameOver;
     return true;
 }
 

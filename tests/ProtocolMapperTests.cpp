@@ -78,3 +78,16 @@ TEST(ProtocolMapperTests, ShouldMapReconnectSyncBundleByAckCursor)
     ASSERT_TRUE(FullResync.bAccepted);
     EXPECT_GE(FullResync.Events.size(), static_cast<size_t>(3));
 }
+
+TEST(ProtocolMapperTests, ShouldMapGameOverPayloadFromPlayerView)
+{
+    FMatchPlayerView View{};
+    View.Result = EGameResult::BlackWin;
+    View.EndReason = EEndReason::Resign;
+    View.TurnIndex = 9;
+
+    const FProtocolGameOverPayload Payload = FProtocolMapper::BuildGameOverPayload(View);
+    EXPECT_EQ(Payload.Result, static_cast<int32_t>(EGameResult::BlackWin));
+    EXPECT_EQ(Payload.EndReason, static_cast<int32_t>(EEndReason::Resign));
+    EXPECT_EQ(Payload.TurnIndex, static_cast<uint64_t>(9));
+}

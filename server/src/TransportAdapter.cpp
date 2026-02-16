@@ -182,6 +182,22 @@ void FServerTransportAdapter::SendSnapshotAndDelta(FPlayerId PlayerId, const FMa
         DeltaMessage.Envelope.PayloadJson = "{}";
     }
     MessageSink->Send(DeltaMessage);
+
+    if (Bundle.Snapshot.Phase == static_cast<int32_t>(EGamePhase::GameOver))
+    {
+        SendGameOver(PlayerId, SyncResponse.MatchId, FProtocolMapper::BuildGameOverPayload(SyncResponse.View));
+    }
+}
+
+void FServerTransportAdapter::SendGameOver(FPlayerId PlayerId, FMatchId MatchId, const FProtocolGameOverPayload& Payload)
+{
+    FOutboundProtocolMessage Message = BuildMessageBase(PlayerId, MatchId, EProtocolMessageType::S2C_GameOver);
+    Message.GameOver = Payload;
+    if (!ProtocolCodec::EncodeGameOverPayload(Payload, Message.Envelope.PayloadJson))
+    {
+        Message.Envelope.PayloadJson = "{}";
+    }
+    MessageSink->Send(Message);
 }
 
 void FServerTransportAdapter::SendError(FPlayerId PlayerId, FMatchId MatchId, std::string ErrorMessage)

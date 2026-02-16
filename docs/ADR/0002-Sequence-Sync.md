@@ -42,3 +42,9 @@
 4. 新增 `FServerGateway + ProtocolCodec`：
    - 负责 `C2S_Join/C2S_Command/C2S_PullSync/C2S_Ack` 的解码与路由；
    - 统一 `ProtocolEnvelope.PayloadJson` 的编解码入口，替代临时调试字符串。
+
+## Decision Update (2026-02-16, GameOver Signal)
+
+1. 协议新增 `FProtocolGameOverPayload`（`Result/EndReason/TurnIndex`）。
+2. 当服务端检测到 `View.Phase == GameOver` 时，在 `S2C_Snapshot + S2C_EventDelta` 之后追加下发 `S2C_GameOver`。
+3. 客户端可将 `S2C_GameOver` 作为终局 UI 的触发信号；最终状态仍以 `Snapshot` 为权威来源。

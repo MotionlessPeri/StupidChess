@@ -18,6 +18,7 @@ struct FOutboundProtocolMessage
     std::optional<FProtocolCommandAckPayload> CommandAck;
     std::optional<FProtocolSnapshotPayload> Snapshot;
     std::optional<FProtocolEventDeltaPayload> EventDelta;
+    std::optional<FProtocolGameOverPayload> GameOver;
     std::string ErrorMessage;
 };
 
@@ -57,6 +58,7 @@ private:
     void SendJoinAck(FPlayerId PlayerId, FMatchId MatchId, const FProtocolJoinAckPayload& Payload);
     void SendCommandAck(FPlayerId PlayerId, FMatchId MatchId, const FProtocolCommandAckPayload& Payload);
     void SendSnapshotAndDelta(FPlayerId PlayerId, const FMatchSyncResponse& SyncResponse);
+    void SendGameOver(FPlayerId PlayerId, FMatchId MatchId, const FProtocolGameOverPayload& Payload);
     void SendError(FPlayerId PlayerId, FMatchId MatchId, std::string ErrorMessage);
 
     FOutboundProtocolMessage BuildMessageBase(FPlayerId PlayerId, FMatchId MatchId, EProtocolMessageType MessageType);

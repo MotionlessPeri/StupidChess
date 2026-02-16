@@ -82,3 +82,20 @@ TEST(ProtocolCodecTests, ShouldRoundTripSnapshotAndEventDeltaPayload)
     EXPECT_EQ(DecodedDelta.RequestedAfterSequence, Bundle.EventDelta.RequestedAfterSequence);
     EXPECT_EQ(DecodedDelta.Events.size(), Bundle.EventDelta.Events.size());
 }
+
+TEST(ProtocolCodecTests, ShouldRoundTripGameOverPayload)
+{
+    const FProtocolGameOverPayload Payload{
+        static_cast<int32_t>(EGameResult::BlackWin),
+        static_cast<int32_t>(EEndReason::Resign),
+        42};
+
+    std::string Json;
+    ASSERT_TRUE(ProtocolCodec::EncodeGameOverPayload(Payload, Json));
+
+    FProtocolGameOverPayload Decoded{};
+    ASSERT_TRUE(ProtocolCodec::DecodeGameOverPayload(Json, Decoded));
+    EXPECT_EQ(Decoded.Result, Payload.Result);
+    EXPECT_EQ(Decoded.EndReason, Payload.EndReason);
+    EXPECT_EQ(Decoded.TurnIndex, Payload.TurnIndex);
+}

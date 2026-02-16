@@ -241,11 +241,27 @@ struct FStupidChessEventDeltaView
     TArray<FStupidChessEventRecordView> Events;
 };
 
+USTRUCT(BlueprintType)
+struct FStupidChessGameOverView
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category = "StupidChess|Server")
+    int32 Result = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category = "StupidChess|Server")
+    int32 EndReason = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category = "StupidChess|Server")
+    int64 TurnIndex = 0;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessJoinAckParsedDelegate, const FStupidChessJoinAckView&, JoinAck);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessCommandAckParsedDelegate, const FStupidChessCommandAckView&, CommandAck);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessErrorParsedDelegate, const FStupidChessErrorView&, Error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessSnapshotParsedDelegate, const FStupidChessSnapshotView&, Snapshot);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessEventDeltaParsedDelegate, const FStupidChessEventDeltaView&, EventDelta);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessGameOverParsedDelegate, const FStupidChessGameOverView&, GameOver);
 
 struct FStupidChessServerRuntime;
 struct FProtocolCommandPayload;
@@ -270,6 +286,9 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category = "StupidChess|Server|Events")
     FStupidChessEventDeltaParsedDelegate OnEventDeltaParsed;
+
+    UPROPERTY(BlueprintAssignable, Category = "StupidChess|Server|Events")
+    FStupidChessGameOverParsedDelegate OnGameOverParsed;
 
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
     virtual void Deinitialize() override;
@@ -343,6 +362,9 @@ public:
     bool DecodeEventDeltaPayloadJson(const FString& PayloadJson, FStupidChessEventDeltaView& OutEventDelta) const;
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
+    bool DecodeGameOverPayloadJson(const FString& PayloadJson, FStupidChessGameOverView& OutGameOver) const;
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
     bool TryParseSnapshotMessage(const FStupidChessOutboundMessage& Message, FStupidChessSnapshotView& OutSnapshot) const;
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
@@ -356,6 +378,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
     bool TryParseErrorMessage(const FStupidChessOutboundMessage& Message, FStupidChessErrorView& OutError) const;
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
+    bool TryParseGameOverMessage(const FStupidChessOutboundMessage& Message, FStupidChessGameOverView& OutGameOver) const;
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     bool GetCachedJoinAck(FStupidChessJoinAckView& OutJoinAck) const;
@@ -371,6 +396,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     bool GetCachedEventDelta(FStupidChessEventDeltaView& OutEventDelta) const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    bool GetCachedGameOver(FStupidChessGameOverView& OutGameOver) const;
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     int64 GetNextClientSequence() const;
@@ -393,9 +421,11 @@ private:
     bool bHasCachedError = false;
     bool bHasCachedSnapshot = false;
     bool bHasCachedEventDelta = false;
+    bool bHasCachedGameOver = false;
     FStupidChessJoinAckView CachedJoinAck{};
     FStupidChessCommandAckView CachedCommandAck{};
     FStupidChessErrorView CachedError{};
     FStupidChessSnapshotView CachedSnapshot{};
     FStupidChessEventDeltaView CachedEventDelta{};
+    FStupidChessGameOverView CachedGameOver{};
 };

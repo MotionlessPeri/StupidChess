@@ -293,17 +293,25 @@ TEST(ServerGatewayTests, ShouldRouteResignCommandAndEnterGameOver)
 
     const std::vector<FOutboundProtocolMessage> RedMessages = Sink.PullMessages(8701);
     const std::vector<FOutboundProtocolMessage> BlackMessages = Sink.PullMessages(8702);
-    ASSERT_EQ(RedMessages.size(), static_cast<size_t>(3));
+    ASSERT_EQ(RedMessages.size(), static_cast<size_t>(4));
     ASSERT_TRUE(RedMessages[0].CommandAck.has_value());
     EXPECT_TRUE(RedMessages[0].CommandAck->bAccepted);
     ASSERT_TRUE(RedMessages[1].Snapshot.has_value());
     EXPECT_EQ(RedMessages[1].Snapshot->Result, static_cast<int32_t>(EGameResult::BlackWin));
     EXPECT_EQ(RedMessages[1].Snapshot->EndReason, static_cast<int32_t>(EEndReason::Resign));
     EXPECT_EQ(RedMessages[1].Snapshot->Phase, static_cast<int32_t>(EGamePhase::GameOver));
+    EXPECT_EQ(RedMessages[3].Envelope.MessageType, EProtocolMessageType::S2C_GameOver);
+    ASSERT_TRUE(RedMessages[3].GameOver.has_value());
+    EXPECT_EQ(RedMessages[3].GameOver->Result, static_cast<int32_t>(EGameResult::BlackWin));
+    EXPECT_EQ(RedMessages[3].GameOver->EndReason, static_cast<int32_t>(EEndReason::Resign));
 
-    ASSERT_EQ(BlackMessages.size(), static_cast<size_t>(2));
+    ASSERT_EQ(BlackMessages.size(), static_cast<size_t>(3));
     ASSERT_TRUE(BlackMessages[0].Snapshot.has_value());
     EXPECT_EQ(BlackMessages[0].Snapshot->Result, static_cast<int32_t>(EGameResult::BlackWin));
     EXPECT_EQ(BlackMessages[0].Snapshot->EndReason, static_cast<int32_t>(EEndReason::Resign));
     EXPECT_EQ(BlackMessages[0].Snapshot->Phase, static_cast<int32_t>(EGamePhase::GameOver));
+    EXPECT_EQ(BlackMessages[2].Envelope.MessageType, EProtocolMessageType::S2C_GameOver);
+    ASSERT_TRUE(BlackMessages[2].GameOver.has_value());
+    EXPECT_EQ(BlackMessages[2].GameOver->Result, static_cast<int32_t>(EGameResult::BlackWin));
+    EXPECT_EQ(BlackMessages[2].GameOver->EndReason, static_cast<int32_t>(EEndReason::Resign));
 }

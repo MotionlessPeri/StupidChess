@@ -16,5 +16,6 @@ public:
     static FProtocolCommandAckPayload BuildCommandAckPayload(const FCommandResult& CommandResult);
     static FProtocolSnapshotPayload BuildSnapshotPayload(const FMatchPlayerView& View, uint64_t LastEventSequence);
     static FProtocolEventDeltaPayload BuildEventDeltaPayload(const FMatchSyncResponse& SyncResponse);
+    static FProtocolGameOverPayload BuildGameOverPayload(const FMatchPlayerView& View);
     static FProtocolSyncBundle BuildSyncBundle(const FMatchSyncResponse& SyncResponse);
 };

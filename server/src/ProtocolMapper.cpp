@@ -102,6 +102,15 @@ FProtocolEventDeltaPayload FProtocolMapper::BuildEventDeltaPayload(const FMatchS
     return Payload;
 }
 
+FProtocolGameOverPayload FProtocolMapper::BuildGameOverPayload(const FMatchPlayerView& View)
+{
+    FProtocolGameOverPayload Payload{};
+    Payload.Result = ToInt(View.Result);
+    Payload.EndReason = ToInt(View.EndReason);
+    Payload.TurnIndex = View.TurnIndex;
+    return Payload;
+}
+
 FProtocolSyncBundle FProtocolMapper::BuildSyncBundle(const FMatchSyncResponse& SyncResponse)
 {
     FProtocolSyncBundle Bundle{};

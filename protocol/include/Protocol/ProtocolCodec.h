@@ -34,6 +34,9 @@ bool DecodeSnapshotPayload(const std::string& Json, FProtocolSnapshotPayload& Ou
 bool EncodeEventDeltaPayload(const FProtocolEventDeltaPayload& Payload, std::string& OutJson);
 bool DecodeEventDeltaPayload(const std::string& Json, FProtocolEventDeltaPayload& OutPayload);
 
+bool EncodeGameOverPayload(const FProtocolGameOverPayload& Payload, std::string& OutJson);
+bool DecodeGameOverPayload(const std::string& Json, FProtocolGameOverPayload& OutPayload);
+
 bool EncodeErrorPayload(const FProtocolErrorPayload& Payload, std::string& OutJson);
 bool DecodeErrorPayload(const std::string& Json, FProtocolErrorPayload& OutPayload);
 }
