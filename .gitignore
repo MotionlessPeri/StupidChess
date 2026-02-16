@@ -9,3 +9,17 @@ out/
 *.userosscache
 *.sln.docstates
 prompt.md
+
+# Unreal Engine generated files
+clients/ue/**/.vs/
+clients/ue/**/Binaries/
+clients/ue/**/DerivedDataCache/
+clients/ue/**/Intermediate/
+clients/ue/**/Saved/
+clients/ue/**/*.sln
+clients/ue/**/*.opensdf
+clients/ue/**/*.sdf
+clients/ue/**/*.suo
+clients/ue/**/*.VC.db
+clients/ue/**/*.VC.opendb
+clients/ue/**/*.vsconfig

@@ -30,6 +30,7 @@
 4. 构建参数统一通过 `CMakePresets.json` 管理，避免绕过 toolchain 约束。
 5. `vcpkg.json` 必须固定 `builtin-baseline`，避免不同 vcpkg 实例解析到不一致的 ports 版本。
 6. 测试依赖通过 manifest feature（`tests`）启用，避免无测试构建下载不必要依赖。
+7. UE 内容资产仍使用 Git 管理，但必须通过 Git LFS 跟踪二进制资产（如 `*.uasset`、`*.umap`）。
 
 ## 记录要求
 

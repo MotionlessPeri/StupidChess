@@ -19,10 +19,11 @@
 7. `server` transport 骨架：`FServerTransportAdapter + FInMemoryServerMessageSink`（Join/Command/PullSync/Ack 下发路径）。
 8. `protocol` 编解码：`ProtocolCodec`（Envelope/Join/Command/PullSync/Ack/Snapshot/EventDelta/Error）。
 9. `server` 网关层：`FServerGateway`（`C2S` 消息解码与路由）。
+10. UE 版本控制基线：补充 UE 生成物 `.gitignore` 与内容资产 `.gitattributes`（Git LFS）规则。
 
 ## In Progress
 
-1. 等待 UE 项目创建后接入客户端 facade（当前后端闭环已完成）。
+1. 等待你确认 UE 项目目录清单后，开始 UE 客户端 `Join/Sync/Ack` 最小接入。
 
 ## Next Steps
 
