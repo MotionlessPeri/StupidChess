@@ -66,14 +66,17 @@
 24. UE 终局视图易用性增强：
     - `FStupidChessGameOverView` 新增 `bIsDraw` 与 `WinnerSide`，减少蓝图层重复判定逻辑。
     - `DecodeGameOverPayloadJson` 自动映射赢家阵营与和局标志，缓存读取与自动化断言同步覆盖。
+25. UE 蓝图接线预制能力：
+    - `UStupidChessLocalMatchSubsystem` 新增 `BuildStandardSetupPlacements`，直接产出标准 16 子摆法（含红黑镜像）。
+    - 新增 `clients/ue/BlueprintQuickStart.md`，提供最小本地联调蓝图模板（Join/CommitReveal/Move/Resign/Pull）。
 
 ## In Progress
 
-1. 准备 UE 项目内的蓝图接线模板（GameInstance/Widget 订阅 `On*Parsed`，驱动 UI 状态更新）。
+1. 等待在 UE 编辑器内按 `BlueprintQuickStart` 落地第一个可交互调试 Widget。
 
 ## Next Steps
 
-1. 在 UE 工程内创建最小蓝图样例（加入房间、提交命令、订阅 `On*Parsed` 更新文本/棋盘状态）。
+1. 在 UE 工程内按模板创建 `WBP_LocalMatchDebug` 并完成按钮/事件接线。
 2. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
 3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 

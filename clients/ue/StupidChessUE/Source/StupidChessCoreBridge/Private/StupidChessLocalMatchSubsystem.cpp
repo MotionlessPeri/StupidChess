@@ -15,6 +15,18 @@
 
 namespace
 {
+struct FSetupSlot
+{
+    int32 X;
+    int32 Y;
+};
+
+constexpr FSetupSlot StandardSetupSlots[16] = {
+    {0, 0}, {1, 0}, {2, 0}, {3, 0},
+    {4, 0}, {5, 0}, {6, 0}, {7, 0},
+    {8, 0}, {1, 2}, {7, 2}, {0, 3},
+    {2, 3}, {4, 3}, {6, 3}, {8, 3}};
+
 EProtocolMessageType ToProtocolMessageType(EStupidChessProtocolMessageType MessageType)
 {
     switch (MessageType)
@@ -231,6 +243,30 @@ bool UStupidChessLocalMatchSubsystem::SubmitRevealSetup(
     }
 
     return SubmitCommandPayload(MatchId, CommandPayload);
+}
+
+TArray<FStupidChessSetupPlacement> UStupidChessLocalMatchSubsystem::BuildStandardSetupPlacements(EStupidChessSide Side) const
+{
+    TArray<FStupidChessSetupPlacement> Placements;
+    Placements.Reserve(16);
+
+    const int32 BasePieceId = Side == EStupidChessSide::Red ? 0 : 16;
+    for (int32 Index = 0; Index < 16; ++Index)
+    {
+        int32 Y = StandardSetupSlots[Index].Y;
+        if (Side == EStupidChessSide::Black)
+        {
+            Y = 9 - Y;
+        }
+
+        FStupidChessSetupPlacement Placement{};
+        Placement.PieceId = BasePieceId + Index;
+        Placement.X = StandardSetupSlots[Index].X;
+        Placement.Y = Y;
+        Placements.Add(Placement);
+    }
+
+    return Placements;
 }
 
 bool UStupidChessLocalMatchSubsystem::SubmitPass(int64 MatchId, int64 PlayerId, EStupidChessSide Side)

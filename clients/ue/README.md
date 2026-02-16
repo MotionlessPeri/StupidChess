@@ -23,20 +23,21 @@ UE 客户端实现目录。
 4. `AckLocalEvents`：发送 `C2S_Ack`。
 5. `SubmitCommitSetup`：封装 `C2S_Command(CommitSetup)`。
 6. `SubmitRevealSetup`：封装 `C2S_Command(RevealSetup)`，支持摆子列表传入。
-7. `SubmitPass`：封装 `C2S_Command(Pass)`。
-8. `SubmitMove`：封装 `C2S_Command(Move)`。
-9. `SubmitResign`：封装 `C2S_Command(Resign)`。
-10. `PullOutboundMessages`：按玩家拉取 `S2C` outbox 消息（返回 UE 结构体，含消息类型与 `PayloadJson`）。
-11. `ResetParsedCache`：清空 subsystem 内部最近一次结构化解析缓存。
-12. `ParseOutboundMessagesToCache`：批量解析 outbox 消息并缓存最近一次 `JoinAck/CommandAck/Error/Snapshot/EventDelta/GameOver`。
-13. `GetCachedJoinAck` / `GetCachedCommandAck` / `GetCachedError`：读取缓存确认/错误消息视图。
-14. `GetCachedSnapshot` / `GetCachedEventDelta` / `GetCachedGameOver`：读取缓存状态同步与终局视图。
-15. `PullParseAndDispatchOutboundMessages`：按玩家拉取 outbox、更新解析缓存并触发 Blueprint 事件分发。
-16. `GetLastPulledMessages` / `GetLastPulledMessageCount`：读取最近一次拉取的原始消息批次。
-17. `DecodeJoinAckPayloadJson` / `DecodeCommandAckPayloadJson` / `DecodeErrorPayloadJson`：将常用确认/错误消息 JSON 解码为 UE 结构化视图。
-18. `DecodeSnapshotPayloadJson` / `DecodeEventDeltaPayloadJson` / `DecodeGameOverPayloadJson`：将状态同步与终局消息 JSON 解码为 UE 结构化视图。
-19. `TryParseJoinAckMessage` / `TryParseCommandAckMessage` / `TryParseErrorMessage`：按消息类型安全解析 outbox 确认与错误消息。
-20. `TryParseSnapshotMessage` / `TryParseEventDeltaMessage` / `TryParseGameOverMessage`：按消息类型安全解析 outbox 状态同步与终局消息。
+7. `BuildStandardSetupPlacements`：返回标准 16 子摆放（红黑自动镜像），用于快速接 `RevealSetup`。
+8. `SubmitPass`：封装 `C2S_Command(Pass)`。
+9. `SubmitMove`：封装 `C2S_Command(Move)`。
+10. `SubmitResign`：封装 `C2S_Command(Resign)`。
+11. `PullOutboundMessages`：按玩家拉取 `S2C` outbox 消息（返回 UE 结构体，含消息类型与 `PayloadJson`）。
+12. `ResetParsedCache`：清空 subsystem 内部最近一次结构化解析缓存。
+13. `ParseOutboundMessagesToCache`：批量解析 outbox 消息并缓存最近一次 `JoinAck/CommandAck/Error/Snapshot/EventDelta/GameOver`。
+14. `GetCachedJoinAck` / `GetCachedCommandAck` / `GetCachedError`：读取缓存确认/错误消息视图。
+15. `GetCachedSnapshot` / `GetCachedEventDelta` / `GetCachedGameOver`：读取缓存状态同步与终局视图。
+16. `PullParseAndDispatchOutboundMessages`：按玩家拉取 outbox、更新解析缓存并触发 Blueprint 事件分发。
+17. `GetLastPulledMessages` / `GetLastPulledMessageCount`：读取最近一次拉取的原始消息批次。
+18. `DecodeJoinAckPayloadJson` / `DecodeCommandAckPayloadJson` / `DecodeErrorPayloadJson`：将常用确认/错误消息 JSON 解码为 UE 结构化视图。
+19. `DecodeSnapshotPayloadJson` / `DecodeEventDeltaPayloadJson` / `DecodeGameOverPayloadJson`：将状态同步与终局消息 JSON 解码为 UE 结构化视图。
+20. `TryParseJoinAckMessage` / `TryParseCommandAckMessage` / `TryParseErrorMessage`：按消息类型安全解析 outbox 确认与错误消息。
+21. `TryParseSnapshotMessage` / `TryParseEventDeltaMessage` / `TryParseGameOverMessage`：按消息类型安全解析 outbox 状态同步与终局消息。
 
 `FStupidChessGameOverView` 除终局基础字段外，额外提供 UI 友好字段：
 
@@ -55,6 +56,8 @@ UE 客户端实现目录。
 6. `OnGameOverParsed`
 
 当前阶段保持协议 JSON 透传，便于先打通网络/状态闭环，再逐步引入更强类型化的 UE ViewModel。
+
+最小蓝图接线模板见：`clients/ue/BlueprintQuickStart.md`。
 
 ## Automation Test
 

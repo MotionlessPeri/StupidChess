@@ -8,36 +8,6 @@
 
 namespace
 {
-TArray<FStupidChessSetupPlacement> BuildStandardSetup(EStupidChessSide Side)
-{
-    static const FIntPoint RedSlots[16] = {
-        FIntPoint(0, 0), FIntPoint(1, 0), FIntPoint(2, 0), FIntPoint(3, 0),
-        FIntPoint(4, 0), FIntPoint(5, 0), FIntPoint(6, 0), FIntPoint(7, 0),
-        FIntPoint(8, 0), FIntPoint(1, 2), FIntPoint(7, 2), FIntPoint(0, 3),
-        FIntPoint(2, 3), FIntPoint(4, 3), FIntPoint(6, 3), FIntPoint(8, 3)};
-
-    TArray<FStupidChessSetupPlacement> Placements;
-    Placements.Reserve(16);
-
-    const int32 BasePieceId = Side == EStupidChessSide::Red ? 0 : 16;
-    for (int32 Index = 0; Index < 16; ++Index)
-    {
-        int32 Y = RedSlots[Index].Y;
-        if (Side == EStupidChessSide::Black)
-        {
-            Y = 9 - Y;
-        }
-
-        FStupidChessSetupPlacement Placement{};
-        Placement.PieceId = BasePieceId + Index;
-        Placement.X = RedSlots[Index].X;
-        Placement.Y = Y;
-        Placements.Add(Placement);
-    }
-
-    return Placements;
-}
-
 const FStupidChessOutboundMessage* FindFirstMessageByType(
     const TArray<FStupidChessOutboundMessage>& Messages,
     EStupidChessProtocolMessageType MessageType)
@@ -82,6 +52,15 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
     }
 
     Subsystem->ResetLocalServer();
+    const TArray<FStupidChessSetupPlacement> StandardRedSetup = Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Red);
+    const TArray<FStupidChessSetupPlacement> StandardBlackSetup = Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Black);
+    TestEqual(TEXT("Standard red setup should contain 16 placements."), StandardRedSetup.Num(), 16);
+    TestEqual(TEXT("Standard black setup should contain 16 placements."), StandardBlackSetup.Num(), 16);
+    if (StandardRedSetup.Num() > 0 && StandardBlackSetup.Num() > 0)
+    {
+        TestEqual(TEXT("Standard red setup first slot y should be 0."), StandardRedSetup[0].Y, 0);
+        TestEqual(TEXT("Standard black setup first slot y should be mirrored to 9."), StandardBlackSetup[0].Y, 9);
+    }
 
     TestTrue(TEXT("Red join should be accepted."), Subsystem->JoinLocalMatch(MatchId, RedPlayerId));
     const TArray<FStupidChessOutboundMessage> RedJoinMessages = Subsystem->PullOutboundMessages(RedPlayerId);
@@ -133,9 +112,9 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Black commit should be accepted."),
              Subsystem->SubmitCommitSetup(MatchId, BlackPlayerId, EStupidChessSide::Black, TEXT("")));
     TestTrue(TEXT("Red reveal should be accepted."),
-             Subsystem->SubmitRevealSetup(MatchId, RedPlayerId, EStupidChessSide::Red, TEXT("R"), BuildStandardSetup(EStupidChessSide::Red)));
+             Subsystem->SubmitRevealSetup(MatchId, RedPlayerId, EStupidChessSide::Red, TEXT("R"), StandardRedSetup));
     TestTrue(TEXT("Black reveal should be accepted."),
-             Subsystem->SubmitRevealSetup(MatchId, BlackPlayerId, EStupidChessSide::Black, TEXT("B"), BuildStandardSetup(EStupidChessSide::Black)));
+             Subsystem->SubmitRevealSetup(MatchId, BlackPlayerId, EStupidChessSide::Black, TEXT("B"), StandardBlackSetup));
 
     Subsystem->ClearOutboundMessages();
 
@@ -325,7 +304,7 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
               Subsystem->PullOutboundMessages(PlayerId).Num(),
               0);
 
-    TArray<FStupidChessSetupPlacement> InvalidPlacements = BuildStandardSetup(EStupidChessSide::Red);
+    TArray<FStupidChessSetupPlacement> InvalidPlacements = Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Red);
     InvalidPlacements[0].PieceId = 70000;
     TestFalse(TEXT("Reveal with invalid placement piece id should be rejected by local validation."),
               Subsystem->SubmitRevealSetup(MatchId, PlayerId, EStupidChessSide::Red, TEXT("R"), InvalidPlacements));

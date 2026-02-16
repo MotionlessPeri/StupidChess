@@ -322,6 +322,9 @@ public:
         const FString& Nonce,
         const TArray<FStupidChessSetupPlacement>& Placements);
 
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    TArray<FStupidChessSetupPlacement> BuildStandardSetupPlacements(EStupidChessSide Side) const;
+
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
     bool SubmitPass(int64 MatchId, int64 PlayerId, EStupidChessSide Side);
 
