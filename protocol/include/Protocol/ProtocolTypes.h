@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 enum class EProtocolMessageType : uint16_t
 {
@@ -23,4 +24,67 @@ struct FProtocolEnvelope
     uint64_t Sequence = 0;
     std::string MatchId;
     std::string PayloadJson;
+};
+
+struct FProtocolJoinPayload
+{
+    uint64_t MatchId = 0;
+    uint64_t PlayerId = 0;
+};
+
+struct FProtocolJoinAckPayload
+{
+    bool bAccepted = false;
+    int32_t AssignedSide = 0;
+    std::string ErrorCode;
+    std::string ErrorMessage;
+};
+
+struct FProtocolCommandAckPayload
+{
+    bool bAccepted = false;
+    std::string ErrorCode;
+    std::string ErrorMessage;
+};
+
+struct FProtocolPieceSnapshot
+{
+    uint16_t PieceId = 0;
+    int32_t Side = 0;
+    int32_t VisibleRole = 0;
+    int32_t X = -1;
+    int32_t Y = -1;
+    bool bAlive = false;
+    bool bFrozen = false;
+    bool bRevealed = false;
+};
+
+struct FProtocolSnapshotPayload
+{
+    int32_t ViewerSide = 0;
+    int32_t Phase = 0;
+    int32_t CurrentTurn = 0;
+    int32_t PassCount = 0;
+    int32_t Result = 0;
+    int32_t EndReason = 0;
+    uint64_t TurnIndex = 0;
+    uint64_t LastEventSequence = 0;
+    std::vector<FProtocolPieceSnapshot> Pieces;
+};
+
+struct FProtocolEventRecordPayload
+{
+    uint64_t Sequence = 0;
+    uint64_t TurnIndex = 0;
+    int32_t EventType = 0;
+    uint64_t ActorPlayerId = 0;
+    std::string ErrorCode;
+    std::string Description;
+};
+
+struct FProtocolEventDeltaPayload
+{
+    uint64_t RequestedAfterSequence = 0;
+    uint64_t LatestSequence = 0;
+    std::vector<FProtocolEventRecordPayload> Events;
 };

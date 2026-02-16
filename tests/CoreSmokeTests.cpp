@@ -167,6 +167,48 @@ TEST(CoreSmokeTests, ShouldRejectRevealWhenPlacementPositionInvalid)
     EXPECT_EQ(RevealResult.ErrorCode, "ERR_INVALID_REVEAL");
 }
 
+TEST(CoreSmokeTests, ShouldRejectRevealBeforeCommitPhaseFinished)
+{
+    FMatchReferee MatchReferee;
+
+    FCommandResult RevealResult = MatchReferee.ApplyReveal(BuildStandardSetup(ESide::Red));
+    EXPECT_FALSE(RevealResult.bAccepted);
+    EXPECT_EQ(RevealResult.ErrorCode, "ERR_INVALID_PHASE");
+}
+
+TEST(CoreSmokeTests, ShouldRejectDuplicateRevealForSameSide)
+{
+    FMatchReferee MatchReferee;
+
+    EXPECT_TRUE(MatchReferee.ApplyCommit({ESide::Red, ""}).bAccepted);
+    EXPECT_TRUE(MatchReferee.ApplyCommit({ESide::Black, ""}).bAccepted);
+    ASSERT_EQ(MatchReferee.GetState().Phase, EGamePhase::SetupReveal);
+
+    const FSetupPlain RedSetup = BuildStandardSetup(ESide::Red);
+    EXPECT_TRUE(MatchReferee.ApplyReveal(RedSetup).bAccepted);
+
+    FCommandResult DuplicateReveal = MatchReferee.ApplyReveal(RedSetup);
+    EXPECT_FALSE(DuplicateReveal.bAccepted);
+    EXPECT_EQ(DuplicateReveal.ErrorCode, "ERR_DUPLICATE_REVEAL");
+}
+
+TEST(CoreSmokeTests, ShouldRejectRevealWhenTargetPositionDuplicated)
+{
+    FMatchReferee MatchReferee;
+
+    EXPECT_TRUE(MatchReferee.ApplyCommit({ESide::Red, ""}).bAccepted);
+    EXPECT_TRUE(MatchReferee.ApplyCommit({ESide::Black, ""}).bAccepted);
+    ASSERT_EQ(MatchReferee.GetState().Phase, EGamePhase::SetupReveal);
+
+    FSetupPlain InvalidRedSetup = BuildStandardSetup(ESide::Red);
+    ASSERT_GE(InvalidRedSetup.Placements.size(), static_cast<size_t>(2));
+    InvalidRedSetup.Placements[1].TargetPos = InvalidRedSetup.Placements[0].TargetPos;
+
+    FCommandResult RevealResult = MatchReferee.ApplyReveal(InvalidRedSetup);
+    EXPECT_FALSE(RevealResult.bAccepted);
+    EXPECT_EQ(RevealResult.ErrorCode, "ERR_INVALID_REVEAL");
+}
+
 TEST(CoreSmokeTests, ShouldRejectPassWhenLegalMovesExist)
 {
     FMatchReferee MatchReferee;
@@ -235,6 +277,58 @@ TEST(CoreSmokeTests, ShouldAdvanceTurnAfterLegalMove)
     EXPECT_TRUE(MoveResult.bAccepted);
     EXPECT_EQ(MatchReferee.GetState().CurrentTurn, ESide::Black);
     EXPECT_EQ(MatchReferee.GetState().TurnIndex, 1);
+}
+
+TEST(CoreSmokeTests, ShouldRejectMoveWhenNotYourTurn)
+{
+    FMatchReferee MatchReferee;
+    StartStandardBattle(MatchReferee);
+
+    FPlayerCommand BlackMoveOnRedTurn{};
+    BlackMoveOnRedTurn.CommandType = ECommandType::Move;
+    BlackMoveOnRedTurn.Side = ESide::Black;
+    BlackMoveOnRedTurn.Move = FMoveAction{
+        static_cast<FPieceId>(16),
+        FBoardPos{0, 9},
+        FBoardPos{0, 8},
+        std::nullopt};
+
+    FCommandResult MoveResult = MatchReferee.ApplyCommand(BlackMoveOnRedTurn);
+    EXPECT_FALSE(MoveResult.bAccepted);
+    EXPECT_EQ(MoveResult.ErrorCode, "ERR_NOT_YOUR_TURN");
+}
+
+TEST(CoreSmokeTests, ShouldRejectMoveWithoutPayload)
+{
+    FMatchReferee MatchReferee;
+    StartStandardBattle(MatchReferee);
+
+    FPlayerCommand MissingPayload{};
+    MissingPayload.CommandType = ECommandType::Move;
+    MissingPayload.Side = ESide::Red;
+
+    FCommandResult MoveResult = MatchReferee.ApplyCommand(MissingPayload);
+    EXPECT_FALSE(MoveResult.bAccepted);
+    EXPECT_EQ(MoveResult.ErrorCode, "ERR_INVALID_PAYLOAD");
+}
+
+TEST(CoreSmokeTests, ShouldRejectMoveWhenFromDoesNotMatchPiecePosition)
+{
+    FMatchReferee MatchReferee;
+    StartStandardBattle(MatchReferee);
+
+    FPlayerCommand WrongFrom{};
+    WrongFrom.CommandType = ECommandType::Move;
+    WrongFrom.Side = ESide::Red;
+    WrongFrom.Move = FMoveAction{
+        static_cast<FPieceId>(0),
+        FBoardPos{1, 1},
+        FBoardPos{0, 1},
+        std::nullopt};
+
+    FCommandResult MoveResult = MatchReferee.ApplyCommand(WrongFrom);
+    EXPECT_FALSE(MoveResult.bAccepted);
+    EXPECT_EQ(MoveResult.ErrorCode, "ERR_INVALID_FROM");
 }
 
 TEST(CoreSmokeTests, ShouldRevealAndFreezePieceAfterFirstCaptureIfActualRoleIllegalAtTarget)

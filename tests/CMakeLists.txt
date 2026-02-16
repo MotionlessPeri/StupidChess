@@ -11,6 +11,8 @@ include(GoogleTest)
 
 add_executable(StupidChessCoreTests
   CoreSmokeTests.cpp
+  MatchSessionTests.cpp
+  MatchServiceTests.cpp
 )
 
 target_compile_features(StupidChessCoreTests PRIVATE cxx_std_20)
@@ -18,10 +20,9 @@ target_compile_features(StupidChessCoreTests PRIVATE cxx_std_20)
 target_link_libraries(StupidChessCoreTests
   PRIVATE
     StupidChess::Core
+    StupidChess::ServerSession
     GTest::gtest
     GTest::gtest_main
 )
 
-gtest_discover_tests(StupidChessCoreTests
-  DISCOVERY_MODE PRE_TEST
-)
+gtest_discover_tests(StupidChessCoreTests)

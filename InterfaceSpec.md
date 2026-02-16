@@ -367,7 +367,6 @@ struct FMatchJoinRequest
 {
     FMatchId MatchId = 0;
     FPlayerId PlayerId = 0;
-    ESide PreferredSide = ESide::Red;
 };
 
 struct FMatchJoinResponse
@@ -375,6 +374,51 @@ struct FMatchJoinResponse
     bool bAccepted = false;
     ESide AssignedSide = ESide::Red;
     std::string ErrorMessage;
+};
+
+struct FPlayerPieceView
+{
+    FPieceId PieceId = 0;
+    ESide Side = ESide::Red;
+    ERoleType VisibleRole = ERoleType::Pawn;
+    FBoardPos Pos{};
+    bool bAlive = false;
+    bool bFrozen = false;
+    bool bRevealed = false;
+};
+
+struct FMatchPlayerView
+{
+    ESide ViewerSide = ESide::Red;
+    EGamePhase Phase = EGamePhase::SetupCommit;
+    ESide CurrentTurn = ESide::Red;
+    int32_t PassCount = 0;
+    EGameResult Result = EGameResult::Ongoing;
+    EEndReason EndReason = EEndReason::None;
+    uint64_t TurnIndex = 0;
+    std::vector<FPlayerPieceView> Pieces;
+};
+
+enum class EMatchEventType : uint8_t
+{
+    PlayerJoined,
+    SetupCommitted,
+    SetupRevealed,
+    MoveApplied,
+    PassApplied,
+    ResignApplied,
+    CommandRejected,
+    GameOver
+};
+
+struct FMatchEventRecord
+{
+    uint64_t Sequence = 0;
+    uint64_t TurnIndex = 0;
+    EMatchEventType EventType = EMatchEventType::PlayerJoined;
+    FPlayerId ActorPlayerId = 0;
+    std::string ErrorCode;
+    std::string Description;
 };
 
 class IMatchSession
@@ -385,8 +429,32 @@ public:
     virtual FMatchJoinResponse Join(const FMatchJoinRequest& Request) = 0;
     virtual FCommandResult SubmitCommand(FPlayerId PlayerId, const FPlayerCommand& Command) = 0;
 
-    virtual FPlayerViewState GetPlayerView(FPlayerId PlayerId) const = 0;
-    virtual std::vector<FGameEvent> PullEvents(FPlayerId PlayerId, uint64_t AfterTurnIndex) const = 0;
+    virtual FMatchPlayerView GetPlayerView(FPlayerId PlayerId) const = 0;
+    virtual std::vector<FMatchEventRecord> PullEvents(FPlayerId PlayerId, uint64_t AfterSequence) const = 0;
+    virtual uint64_t GetLatestEventSequence() const = 0;
+};
+
+struct FMatchSyncResponse
+{
+    bool bAccepted = false;
+    std::string ErrorCode;
+    std::string ErrorMessage;
+    FMatchId MatchId = 0;
+    uint64_t RequestedAfterSequence = 0;
+    uint64_t LatestSequence = 0;
+    FMatchPlayerView View{};
+    std::vector<FMatchEventRecord> Events;
+};
+
+class IMatchService
+{
+public:
+    virtual ~IMatchService() = default;
+
+    virtual FMatchJoinResponse JoinMatch(const FMatchJoinRequest& Request) = 0;
+    virtual FCommandResult SubmitPlayerCommand(FPlayerId PlayerId, const FPlayerCommand& Command) = 0;
+    virtual FMatchSyncResponse PullPlayerSync(FPlayerId PlayerId, std::optional<uint64_t> AfterSequenceOverride) const = 0;
+    virtual bool AckPlayerEvents(FPlayerId PlayerId, uint64_t Sequence) = 0;
 };
 
 class IReplayStore
@@ -423,12 +491,75 @@ struct FProtocolEnvelope
     std::string MatchId;
     std::string PayloadJson;
 };
+
+struct FProtocolJoinPayload
+{
+    uint64_t MatchId = 0;
+    uint64_t PlayerId = 0;
+};
+
+struct FProtocolJoinAckPayload
+{
+    bool bAccepted = false;
+    int32_t AssignedSide = 0;
+    std::string ErrorCode;
+    std::string ErrorMessage;
+};
+
+struct FProtocolCommandAckPayload
+{
+    bool bAccepted = false;
+    std::string ErrorCode;
+    std::string ErrorMessage;
+};
+
+struct FProtocolPieceSnapshot
+{
+    uint16_t PieceId = 0;
+    int32_t Side = 0;
+    int32_t VisibleRole = 0;
+    int32_t X = -1;
+    int32_t Y = -1;
+    bool bAlive = false;
+    bool bFrozen = false;
+    bool bRevealed = false;
+};
+
+struct FProtocolSnapshotPayload
+{
+    int32_t ViewerSide = 0;
+    int32_t Phase = 0;
+    int32_t CurrentTurn = 0;
+    int32_t PassCount = 0;
+    int32_t Result = 0;
+    int32_t EndReason = 0;
+    uint64_t TurnIndex = 0;
+    uint64_t LastEventSequence = 0;
+    std::vector<FProtocolPieceSnapshot> Pieces;
+};
+
+struct FProtocolEventRecordPayload
+{
+    uint64_t Sequence = 0;
+    uint64_t TurnIndex = 0;
+    int32_t EventType = 0;
+    uint64_t ActorPlayerId = 0;
+    std::string ErrorCode;
+    std::string Description;
+};
+
+struct FProtocolEventDeltaPayload
+{
+    uint64_t RequestedAfterSequence = 0;
+    uint64_t LatestSequence = 0;
+    std::vector<FProtocolEventRecordPayload> Events;
+};
 ```
 
 消息约定：
 
 1. `S2C_Snapshot` 仅下发观察方可见信息。
-2. `S2C_EventDelta` 带 `TurnIndex`，客户端可断线续拉。
+2. `S2C_EventDelta` 带 `Sequence`（以及事件内 `TurnIndex`），客户端可断线续拉。
 3. 客户端永不上传“规则结论”，只上传命令意图。
 
 ## 12. UE 适配层接口（UEAdapter）
