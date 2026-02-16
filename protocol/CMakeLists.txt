@@ -1,4 +1,5 @@
-﻿add_library(StupidChessProtocol STATIC
+add_library(StupidChessProtocol STATIC
+  src/ProtocolCodec.cpp
   src/ProtocolTypes.cpp
 )
 

@@ -28,6 +28,7 @@
 4. 事件日志与回放持久化。
 5. 基于 `Sequence` 的断线重连增量同步与 `Ack` 游标管理。
 6. 通过 transport adapter 将服务内模型统一映射为跨端协议消息。
+7. 通过 gateway + protocol codec 统一处理 C2S 消息解码与路由。
 
 ### 2.3 Clients
 

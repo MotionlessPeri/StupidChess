@@ -6,7 +6,7 @@
 
 ## Current Milestone
 
-1. 完成联网 PvP 服务端骨架（会话、房间、事件增量同步、协议映射、transport adapter），进入 UE 接入准备阶段。
+1. 完成联网 PvP 服务端消息闭环（会话、房间、协议编解码、gateway、transport adapter），等待 UE 项目创建后接入。
 
 ## Completed
 
@@ -17,17 +17,19 @@
 5. `server` 映射层：`FProtocolMapper`（内部模型到协议 DTO）。
 6. 文档与 ADR 已同步：`RuleSpec`、`Architecture`、`InterfaceSpec`、`ADR-0002`。
 7. `server` transport 骨架：`FServerTransportAdapter + FInMemoryServerMessageSink`（Join/Command/PullSync/Ack 下发路径）。
+8. `protocol` 编解码：`ProtocolCodec`（Envelope/Join/Command/PullSync/Ack/Snapshot/EventDelta/Error）。
+9. `server` 网关层：`FServerGateway`（`C2S` 消息解码与路由）。
 
 ## In Progress
 
-1. 规划 transport 层序列化边界（`PayloadJson` 当前为调试格式，后续替换为正式协议编码）。
+1. 等待 UE 项目创建后接入客户端 facade（当前后端闭环已完成）。
 
 ## Next Steps
 
-1. 定义正式序列化方案（JSON/二进制）并补编解码测试。
-2. 启动 UE 客户端 facade 的 `Join/Sync/Ack` 对接骨架。
-3. 增加 “命令后双端同步一致” 的回放式集成测试。
+1. 你创建 UE 项目后，接入 `Join/Sync/Ack` 最小闭环。
+2. 增加 “命令后双端同步一致” 的回放式集成测试。
+3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 
 ## Test Baseline
 
-1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（28/28）。
+1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（35/35）。

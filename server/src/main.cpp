@@ -1,3 +1,5 @@
+#include "Protocol/ProtocolCodec.h"
+#include "Server/ServerGateway.h"
 #include "Server/TransportAdapter.h"
 
 #include <iostream>
@@ -9,9 +11,23 @@ int main()
     FInMemoryMatchService Service;
     FInMemoryServerMessageSink Sink;
     FServerTransportAdapter Adapter(&Service, &Sink);
+    FServerGateway Gateway(&Adapter);
 
-    const bool bRedJoined = Adapter.HandleJoinRequest({1, 1001});
-    const bool bBlackJoined = Adapter.HandleJoinRequest({1, 1002});
+    std::string RedJoinJson;
+    ProtocolCodec::EncodeJoinPayload({1, 1001}, RedJoinJson);
+    const bool bRedJoined = Gateway.ProcessEnvelope(FProtocolEnvelope{
+        EProtocolMessageType::C2S_Join,
+        1,
+        "1",
+        RedJoinJson});
+
+    std::string BlackJoinJson;
+    ProtocolCodec::EncodeJoinPayload({1, 1002}, BlackJoinJson);
+    const bool bBlackJoined = Gateway.ProcessEnvelope(FProtocolEnvelope{
+        EProtocolMessageType::C2S_Join,
+        2,
+        "1",
+        BlackJoinJson});
     if (!bRedJoined || !bBlackJoined)
     {
         std::cerr << "Failed to build a two-player session." << std::endl;

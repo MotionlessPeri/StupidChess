@@ -1,25 +1,6 @@
 #include "Server/TransportAdapter.h"
 
-#include <sstream>
-
-namespace
-{
-std::string EscapeJsonString(const std::string& Text)
-{
-    std::string Escaped;
-    Escaped.reserve(Text.size());
-    for (const char Ch : Text)
-    {
-        if (Ch == '\\' || Ch == '"')
-        {
-            Escaped.push_back('\\');
-        }
-        Escaped.push_back(Ch);
-    }
-
-    return Escaped;
-}
-}
+#include "Protocol/ProtocolCodec.h"
 
 void FInMemoryServerMessageSink::Send(const FOutboundProtocolMessage& Message)
 {
@@ -164,7 +145,10 @@ void FServerTransportAdapter::SendJoinAck(FPlayerId PlayerId, FMatchId MatchId, 
 {
     FOutboundProtocolMessage Message = BuildMessageBase(PlayerId, MatchId, EProtocolMessageType::S2C_JoinAck);
     Message.JoinAck = Payload;
-    Message.Envelope.PayloadJson = BuildPayloadJson(Payload);
+    if (!ProtocolCodec::EncodeJoinAckPayload(Payload, Message.Envelope.PayloadJson))
+    {
+        Message.Envelope.PayloadJson = "{}";
+    }
     MessageSink->Send(Message);
 }
 
@@ -172,7 +156,10 @@ void FServerTransportAdapter::SendCommandAck(FPlayerId PlayerId, FMatchId MatchI
 {
     FOutboundProtocolMessage Message = BuildMessageBase(PlayerId, MatchId, EProtocolMessageType::S2C_CommandAck);
     Message.CommandAck = Payload;
-    Message.Envelope.PayloadJson = BuildPayloadJson(Payload);
+    if (!ProtocolCodec::EncodeCommandAckPayload(Payload, Message.Envelope.PayloadJson))
+    {
+        Message.Envelope.PayloadJson = "{}";
+    }
     MessageSink->Send(Message);
 }
 
@@ -182,12 +169,18 @@ void FServerTransportAdapter::SendSnapshotAndDelta(FPlayerId PlayerId, const FMa
 
     FOutboundProtocolMessage SnapshotMessage = BuildMessageBase(PlayerId, SyncResponse.MatchId, EProtocolMessageType::S2C_Snapshot);
     SnapshotMessage.Snapshot = Bundle.Snapshot;
-    SnapshotMessage.Envelope.PayloadJson = BuildPayloadJson(Bundle.Snapshot);
+    if (!ProtocolCodec::EncodeSnapshotPayload(Bundle.Snapshot, SnapshotMessage.Envelope.PayloadJson))
+    {
+        SnapshotMessage.Envelope.PayloadJson = "{}";
+    }
     MessageSink->Send(SnapshotMessage);
 
     FOutboundProtocolMessage DeltaMessage = BuildMessageBase(PlayerId, SyncResponse.MatchId, EProtocolMessageType::S2C_EventDelta);
     DeltaMessage.EventDelta = Bundle.EventDelta;
-    DeltaMessage.Envelope.PayloadJson = BuildPayloadJson(Bundle.EventDelta);
+    if (!ProtocolCodec::EncodeEventDeltaPayload(Bundle.EventDelta, DeltaMessage.Envelope.PayloadJson))
+    {
+        DeltaMessage.Envelope.PayloadJson = "{}";
+    }
     MessageSink->Send(DeltaMessage);
 }
 
@@ -195,7 +188,10 @@ void FServerTransportAdapter::SendError(FPlayerId PlayerId, FMatchId MatchId, st
 {
     FOutboundProtocolMessage Message = BuildMessageBase(PlayerId, MatchId, EProtocolMessageType::S2C_Error);
     Message.ErrorMessage = std::move(ErrorMessage);
-    Message.Envelope.PayloadJson = "{\"error\":\"" + EscapeJsonString(Message.ErrorMessage) + "\"}";
+    if (!ProtocolCodec::EncodeErrorPayload(FProtocolErrorPayload{Message.ErrorMessage}, Message.Envelope.PayloadJson))
+    {
+        Message.Envelope.PayloadJson = "{}";
+    }
     MessageSink->Send(Message);
 }
 
@@ -210,42 +206,4 @@ FOutboundProtocolMessage FServerTransportAdapter::BuildMessageBase(FPlayerId Pla
         std::to_string(MatchId),
         {}};
     return Message;
-}
-
-std::string FServerTransportAdapter::BuildPayloadJson(const FProtocolJoinAckPayload& Payload) const
-{
-    std::ostringstream Stream;
-    Stream << "{\"accepted\":" << (Payload.bAccepted ? "true" : "false")
-           << ",\"assignedSide\":" << Payload.AssignedSide
-           << ",\"errorCode\":\"" << EscapeJsonString(Payload.ErrorCode) << "\""
-           << ",\"errorMessage\":\"" << EscapeJsonString(Payload.ErrorMessage) << "\"}";
-    return Stream.str();
-}
-
-std::string FServerTransportAdapter::BuildPayloadJson(const FProtocolCommandAckPayload& Payload) const
-{
-    std::ostringstream Stream;
-    Stream << "{\"accepted\":" << (Payload.bAccepted ? "true" : "false")
-           << ",\"errorCode\":\"" << EscapeJsonString(Payload.ErrorCode) << "\""
-           << ",\"errorMessage\":\"" << EscapeJsonString(Payload.ErrorMessage) << "\"}";
-    return Stream.str();
-}
-
-std::string FServerTransportAdapter::BuildPayloadJson(const FProtocolSnapshotPayload& Payload) const
-{
-    std::ostringstream Stream;
-    Stream << "{\"phase\":" << Payload.Phase
-           << ",\"turnIndex\":" << Payload.TurnIndex
-           << ",\"lastEventSequence\":" << Payload.LastEventSequence
-           << ",\"piecesCount\":" << Payload.Pieces.size() << "}";
-    return Stream.str();
-}
-
-std::string FServerTransportAdapter::BuildPayloadJson(const FProtocolEventDeltaPayload& Payload) const
-{
-    std::ostringstream Stream;
-    Stream << "{\"requestedAfter\":" << Payload.RequestedAfterSequence
-           << ",\"latest\":" << Payload.LatestSequence
-           << ",\"eventsCount\":" << Payload.Events.size() << "}";
-    return Stream.str();
 }

@@ -19,6 +19,9 @@
    - 处理 Join/Command/PullSync/Ack 请求入口。
    - 统一下发 `S2C_JoinAck/S2C_CommandAck/S2C_Snapshot/S2C_EventDelta/S2C_Error`。
    - `FInMemoryServerMessageSink` 提供测试与本地验证用 outbox。
+5. `FServerGateway`
+   - 接收 `ProtocolEnvelope`（或 JSON），解码 `C2S` payload 并路由到 transport adapter。
+   - 当前支持 `C2S_Join/C2S_Command/C2S_PullSync/C2S_Ack/C2S_Ping`。
 
 ## 约束
 

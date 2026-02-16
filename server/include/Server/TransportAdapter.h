@@ -60,10 +60,6 @@ private:
     void SendError(FPlayerId PlayerId, FMatchId MatchId, std::string ErrorMessage);
 
     FOutboundProtocolMessage BuildMessageBase(FPlayerId PlayerId, FMatchId MatchId, EProtocolMessageType MessageType);
-    std::string BuildPayloadJson(const FProtocolJoinAckPayload& Payload) const;
-    std::string BuildPayloadJson(const FProtocolCommandAckPayload& Payload) const;
-    std::string BuildPayloadJson(const FProtocolSnapshotPayload& Payload) const;
-    std::string BuildPayloadJson(const FProtocolEventDeltaPayload& Payload) const;
 
 private:
     FInMemoryMatchService* MatchService = nullptr;

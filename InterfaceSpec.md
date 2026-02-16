@@ -495,6 +495,15 @@ public:
     virtual bool HandlePullSync(FPlayerId PlayerId, std::optional<uint64_t> AfterSequenceOverride) = 0;
     virtual bool HandleAck(FPlayerId PlayerId, uint64_t Sequence) = 0;
 };
+
+class IServerGateway
+{
+public:
+    virtual ~IServerGateway() = default;
+
+    virtual bool ProcessEnvelope(const FProtocolEnvelope& Envelope) = 0;
+    virtual bool ProcessEnvelopeJson(const std::string& EnvelopeJson) = 0;
+};
 ```
 
 ## 11. 协议 DTO（Protocol）
@@ -505,6 +514,8 @@ enum class EProtocolMessageType : uint16_t
     C2S_Join = 100,
     C2S_Command = 101,
     C2S_Ping = 102,
+    C2S_PullSync = 103,
+    C2S_Ack = 104,
 
     S2C_JoinAck = 200,
     S2C_CommandAck = 201,
@@ -526,6 +537,66 @@ struct FProtocolJoinPayload
 {
     uint64_t MatchId = 0;
     uint64_t PlayerId = 0;
+};
+
+struct FProtocolMovePayload
+{
+    uint16_t PieceId = 0;
+    int32_t FromX = -1;
+    int32_t FromY = -1;
+    int32_t ToX = -1;
+    int32_t ToY = -1;
+    bool bHasCapturedPieceId = false;
+    uint16_t CapturedPieceId = 0;
+};
+
+struct FProtocolSetupPlacementPayload
+{
+    uint16_t PieceId = 0;
+    int32_t X = -1;
+    int32_t Y = -1;
+};
+
+struct FProtocolSetupCommitPayload
+{
+    int32_t Side = 0;
+    std::string HashHex;
+};
+
+struct FProtocolSetupPlainPayload
+{
+    int32_t Side = 0;
+    std::string Nonce;
+    std::vector<FProtocolSetupPlacementPayload> Placements;
+};
+
+struct FProtocolCommandPayload
+{
+    uint64_t PlayerId = 0;
+    int32_t CommandType = 0;
+    int32_t Side = 0;
+
+    bool bHasMove = false;
+    FProtocolMovePayload Move{};
+
+    bool bHasSetupCommit = false;
+    FProtocolSetupCommitPayload SetupCommit{};
+
+    bool bHasSetupPlain = false;
+    FProtocolSetupPlainPayload SetupPlain{};
+};
+
+struct FProtocolPullSyncPayload
+{
+    uint64_t PlayerId = 0;
+    bool bHasAfterSequenceOverride = false;
+    uint64_t AfterSequenceOverride = 0;
+};
+
+struct FProtocolAckPayload
+{
+    uint64_t PlayerId = 0;
+    uint64_t Sequence = 0;
 };
 
 struct FProtocolJoinAckPayload
@@ -585,6 +656,11 @@ struct FProtocolEventDeltaPayload
     std::vector<FProtocolEventRecordPayload> Events;
 };
 
+struct FProtocolErrorPayload
+{
+    std::string ErrorMessage;
+};
+
 class IProtocolMapper
 {
 public:
@@ -595,6 +671,23 @@ public:
     virtual FProtocolSnapshotPayload BuildSnapshotPayload(const FMatchPlayerView& View, uint64_t LastEventSequence) const = 0;
     virtual FProtocolEventDeltaPayload BuildEventDeltaPayload(const FMatchSyncResponse& SyncResponse) const = 0;
 };
+
+class IProtocolCodec
+{
+public:
+    virtual ~IProtocolCodec() = default;
+
+    virtual bool EncodeEnvelope(const FProtocolEnvelope& Envelope, std::string& OutJson) const = 0;
+    virtual bool DecodeEnvelope(const std::string& Json, FProtocolEnvelope& OutEnvelope) const = 0;
+    virtual bool EncodeJoinPayload(const FProtocolJoinPayload& Payload, std::string& OutJson) const = 0;
+    virtual bool DecodeJoinPayload(const std::string& Json, FProtocolJoinPayload& OutPayload) const = 0;
+    virtual bool EncodeCommandPayload(const FProtocolCommandPayload& Payload, std::string& OutJson) const = 0;
+    virtual bool DecodeCommandPayload(const std::string& Json, FProtocolCommandPayload& OutPayload) const = 0;
+    virtual bool EncodePullSyncPayload(const FProtocolPullSyncPayload& Payload, std::string& OutJson) const = 0;
+    virtual bool DecodePullSyncPayload(const std::string& Json, FProtocolPullSyncPayload& OutPayload) const = 0;
+    virtual bool EncodeAckPayload(const FProtocolAckPayload& Payload, std::string& OutJson) const = 0;
+    virtual bool DecodeAckPayload(const std::string& Json, FProtocolAckPayload& OutPayload) const = 0;
+};
 ```
 
 消息约定：
@@ -602,6 +695,7 @@ public:
 1. `S2C_Snapshot` 仅下发观察方可见信息。
 2. `S2C_EventDelta` 带 `Sequence`（以及事件内 `TurnIndex`），客户端可断线续拉。
 3. 客户端永不上传“规则结论”，只上传命令意图。
+4. 客户端通过 `C2S_PullSync` 与 `C2S_Ack` 驱动断线重连补发与已处理游标推进。
 
 ## 12. UE 适配层接口（UEAdapter）
 

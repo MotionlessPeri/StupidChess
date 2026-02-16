@@ -13,7 +13,9 @@ add_executable(StupidChessCoreTests
   CoreSmokeTests.cpp
   MatchSessionTests.cpp
   MatchServiceTests.cpp
+  ProtocolCodecTests.cpp
   ProtocolMapperTests.cpp
+  ServerGatewayTests.cpp
   TransportAdapterTests.cpp
 )
 

@@ -39,3 +39,6 @@
    - 统一下发 `S2C_JoinAck/S2C_CommandAck/S2C_Snapshot/S2C_EventDelta/S2C_Error`。
 2. `Join` 成功后立即下发一次 `Snapshot + EventDelta`，保证客户端首帧可见状态与事件游标对齐。
 3. 命令被接受后，按同房玩家视角分别下发 `Snapshot + EventDelta`，避免前端自行推导规则结论。
+4. 新增 `FServerGateway + ProtocolCodec`：
+   - 负责 `C2S_Join/C2S_Command/C2S_PullSync/C2S_Ack` 的解码与路由；
+   - 统一 `ProtocolEnvelope.PayloadJson` 的编解码入口，替代临时调试字符串。
