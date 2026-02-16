@@ -31,6 +31,7 @@ public:
 
     std::optional<FMatchId> FindPlayerMatch(FPlayerId PlayerId) const;
     std::optional<uint64_t> GetPlayerAckSequence(FPlayerId PlayerId) const;
+    std::vector<FPlayerId> GetPlayersInMatch(FMatchId MatchId) const;
     size_t GetActiveMatchCount() const noexcept;
 
 private:

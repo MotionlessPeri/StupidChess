@@ -6,7 +6,7 @@
 
 ## Current Milestone
 
-1. 完成联网 PvP 服务端骨架（会话、房间、事件增量同步、协议映射），进入客户端接入准备阶段。
+1. 完成联网 PvP 服务端骨架（会话、房间、事件增量同步、协议映射、transport adapter），进入 UE 接入准备阶段。
 
 ## Completed
 
@@ -16,17 +16,18 @@
 4. `protocol` DTO：`JoinAck/CommandAck/Snapshot/EventDelta`。
 5. `server` 映射层：`FProtocolMapper`（内部模型到协议 DTO）。
 6. 文档与 ADR 已同步：`RuleSpec`、`Architecture`、`InterfaceSpec`、`ADR-0002`。
+7. `server` transport 骨架：`FServerTransportAdapter + FInMemoryServerMessageSink`（Join/Command/PullSync/Ack 下发路径）。
 
 ## In Progress
 
-1. 规划 server transport adapter（把 `ProtocolMapper` 结果组包为可传输消息）。
+1. 规划 transport 层序列化边界（`PayloadJson` 当前为调试格式，后续替换为正式协议编码）。
 
 ## Next Steps
 
-1. 增加 transport 层接口骨架（连接、收发、会话绑定）。
-2. 补齐 `S2C_Snapshot/S2C_EventDelta` 发送路径示例与测试。
-3. 启动 UE 客户端 facade 的 `Join/Sync/Ack` 对接骨架。
+1. 定义正式序列化方案（JSON/二进制）并补编解码测试。
+2. 启动 UE 客户端 facade 的 `Join/Sync/Ack` 对接骨架。
+3. 增加 “命令后双端同步一致” 的回放式集成测试。
 
 ## Test Baseline
 
-1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（24/24）。
+1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（28/28）。

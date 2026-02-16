@@ -31,3 +31,11 @@
 1. 服务端需要维护玩家绑定状态与游标状态。
 2. 客户端需持久化最近处理完成的 `Sequence`，用于重连恢复。
 3. 协议变更需要保持向后兼容策略（后续通过版本字段管理）。
+
+## Decision Update (2026-02-16)
+
+1. 新增 `FServerTransportAdapter` 作为服务入口：
+   - 处理 `Join/Command/PullSync/Ack`；
+   - 统一下发 `S2C_JoinAck/S2C_CommandAck/S2C_Snapshot/S2C_EventDelta/S2C_Error`。
+2. `Join` 成功后立即下发一次 `Snapshot + EventDelta`，保证客户端首帧可见状态与事件游标对齐。
+3. 命令被接受后，按同房玩家视角分别下发 `Snapshot + EventDelta`，避免前端自行推导规则结论。

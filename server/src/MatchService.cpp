@@ -1,5 +1,7 @@
 #include "Server/MatchService.h"
 
+#include <algorithm>
+
 FMatchJoinResponse FInMemoryMatchService::JoinMatch(const FMatchJoinRequest& Request)
 {
     if (Request.MatchId == 0 || Request.PlayerId == 0)
@@ -130,6 +132,21 @@ std::optional<uint64_t> FInMemoryMatchService::GetPlayerAckSequence(FPlayerId Pl
     }
 
     return It->second.LastAckedSequence;
+}
+
+std::vector<FPlayerId> FInMemoryMatchService::GetPlayersInMatch(FMatchId MatchId) const
+{
+    std::vector<FPlayerId> Players;
+    for (const auto& Entry : PlayerBindings)
+    {
+        if (Entry.second.MatchId == MatchId)
+        {
+            Players.push_back(Entry.first);
+        }
+    }
+
+    std::sort(Players.begin(), Players.end());
+    return Players;
 }
 
 size_t FInMemoryMatchService::GetActiveMatchCount() const noexcept

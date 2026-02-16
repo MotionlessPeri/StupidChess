@@ -14,3 +14,4 @@
 2. `S2C_EventDelta` 以 `RequestedAfterSequence` 和 `LatestSequence` 进行断线续拉。
 3. 当前仅定义 DTO，不绑定具体序列化协议（JSON/二进制后续在 adapter 决策）。
 4. DTO 的组包职责在 `server` 侧 `FProtocolMapper`，避免规则层与协议层直接耦合。
+5. 当前 transport 骨架由 `FServerTransportAdapter` 负责发送到 sink/outbox，便于后续替换为真实网络层。

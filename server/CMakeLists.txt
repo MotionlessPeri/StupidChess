@@ -2,6 +2,7 @@ add_library(StupidChessServerSession STATIC
   src/MatchService.cpp
   src/MatchSession.cpp
   src/ProtocolMapper.cpp
+  src/TransportAdapter.cpp
 )
 
 add_library(StupidChess::ServerSession ALIAS StupidChessServerSession)

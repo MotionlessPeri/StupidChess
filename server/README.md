@@ -15,6 +15,10 @@
 3. `FProtocolMapper`
    - 将 `MatchService/MatchSession` 内部模型映射为 `protocol` DTO。
    - 统一 `JoinAck/CommandAck/Snapshot/EventDelta` 的字段口径。
+4. `FServerTransportAdapter`
+   - 处理 Join/Command/PullSync/Ack 请求入口。
+   - 统一下发 `S2C_JoinAck/S2C_CommandAck/S2C_Snapshot/S2C_EventDelta/S2C_Error`。
+   - `FInMemoryServerMessageSink` 提供测试与本地验证用 outbox。
 
 ## 约束
 

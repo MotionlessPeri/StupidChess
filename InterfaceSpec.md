@@ -465,6 +465,36 @@ public:
     virtual void AppendEvent(FMatchId MatchId, const FGameEvent& Event) = 0;
     virtual std::vector<FGameEvent> LoadAll(FMatchId MatchId) const = 0;
 };
+
+struct FOutboundProtocolMessage
+{
+    FPlayerId PlayerId = 0;
+    uint64_t ServerSequence = 0;
+    FProtocolEnvelope Envelope{};
+    std::optional<FProtocolJoinAckPayload> JoinAck;
+    std::optional<FProtocolCommandAckPayload> CommandAck;
+    std::optional<FProtocolSnapshotPayload> Snapshot;
+    std::optional<FProtocolEventDeltaPayload> EventDelta;
+    std::string ErrorMessage;
+};
+
+class IServerMessageSink
+{
+public:
+    virtual ~IServerMessageSink() = default;
+    virtual void Send(const FOutboundProtocolMessage& Message) = 0;
+};
+
+class IServerTransportAdapter
+{
+public:
+    virtual ~IServerTransportAdapter() = default;
+
+    virtual bool HandleJoinRequest(const FProtocolJoinPayload& JoinPayload) = 0;
+    virtual bool HandlePlayerCommand(FPlayerId PlayerId, const FPlayerCommand& Command) = 0;
+    virtual bool HandlePullSync(FPlayerId PlayerId, std::optional<uint64_t> AfterSequenceOverride) = 0;
+    virtual bool HandleAck(FPlayerId PlayerId, uint64_t Sequence) = 0;
+};
 ```
 
 ## 11. 协议 DTO（Protocol）
