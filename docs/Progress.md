@@ -6,7 +6,7 @@
 
 ## Current Milestone
 
-1. 完成 UE 侧最小桥接闭环（Join/PullSync/Ack + outbox 拉取），为后续命令接入与表现层绑定做准备。
+1. 完成 UE 侧桥接可消费化（结构化解析 + 解析缓存），为蓝图绑定和消息派发层做准备。
 
 ## Completed
 
@@ -51,15 +51,18 @@
 20. UE bridge 错误路径自动化测试：
     - 新增 `StupidChess.UE.CoreBridge.ErrorPaths` 自动化用例。
     - 覆盖本地参数校验拒绝、服务端拒绝命令、以及 JSON 解码失败路径。
+21. UE bridge 解析缓存能力：
+    - `UStupidChessLocalMatchSubsystem` 新增 `ResetParsedCache/ParseOutboundMessagesToCache` 与 `GetCached*` 接口。
+    - `LocalFlow` 与 `ErrorPaths` 自动化用例新增缓存读取断言（确认/快照/增量/错误消息）。
 
 ## In Progress
 
-1. 评估 UE 自动化测试在 CI/本地命令行的稳定运行参数（启动时间、渲染开销、日志输出）。
+1. 评估 UE bridge 消息派发/订阅接口设计（减少 UI 侧轮询 outbox）。
 
 ## Next Steps
 
-1. 评估是否将结构化解析结果直接缓存为 subsystem 内部可订阅状态。
-2. 评估在 UE bridge 侧引入消息派发/订阅接口（减少上层轮询 outbox）。
+1. 在 `UStupidChessLocalMatchSubsystem` 增加消息事件分发 API（BlueprintAssignable 或委托）。
+2. 将 `ParsedCache` 与事件分发打通，支持 UI 直接绑定“最近消息”。
 3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 
 ## Test Baseline

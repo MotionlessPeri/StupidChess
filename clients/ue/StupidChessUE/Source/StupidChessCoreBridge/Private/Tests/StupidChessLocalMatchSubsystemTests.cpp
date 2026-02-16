@@ -95,6 +95,14 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Red join ack should parse."), Subsystem->TryParseJoinAckMessage(*RedJoinAckMessage, RedJoinAck));
         TestTrue(TEXT("Red join ack should be accepted."), RedJoinAck.bAccepted);
         TestEqual(TEXT("Red should be assigned Red side."), RedJoinAck.AssignedSide, static_cast<int32>(ESide::Red));
+
+        Subsystem->ResetParsedCache();
+        TestEqual(TEXT("JoinAck cache parse count should be one."),
+                  Subsystem->ParseOutboundMessagesToCache(TArray<FStupidChessOutboundMessage>{*RedJoinAckMessage}),
+                  1);
+        FStupidChessJoinAckView CachedJoinAck{};
+        TestTrue(TEXT("JoinAck should be retrievable from cache."), Subsystem->GetCachedJoinAck(CachedJoinAck));
+        TestTrue(TEXT("Cached join ack should remain accepted."), CachedJoinAck.bAccepted);
     }
 
     Subsystem->ClearOutboundMessages();
@@ -171,6 +179,25 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Move should append at least one event."), Delta.Events.Num() > 0);
     }
 
+    Subsystem->ResetParsedCache();
+    TestEqual(TEXT("Move response cache parse count should be three."),
+              Subsystem->ParseOutboundMessagesToCache(RedMoveMessages),
+              3);
+    FStupidChessCommandAckView CachedMoveAck{};
+    TestTrue(TEXT("Cached command ack should be available after move response."),
+             Subsystem->GetCachedCommandAck(CachedMoveAck));
+    TestTrue(TEXT("Cached move ack should be accepted."), CachedMoveAck.bAccepted);
+    FStupidChessSnapshotView CachedMoveSnapshot{};
+    TestTrue(TEXT("Cached snapshot should be available after move response."),
+             Subsystem->GetCachedSnapshot(CachedMoveSnapshot));
+    TestEqual(TEXT("Cached snapshot turn should be black after red move."),
+              CachedMoveSnapshot.CurrentTurn,
+              static_cast<int32>(ESide::Black));
+    FStupidChessEventDeltaView CachedMoveDelta{};
+    TestTrue(TEXT("Cached event delta should be available after move response."),
+             Subsystem->GetCachedEventDelta(CachedMoveDelta));
+    TestTrue(TEXT("Cached event delta should contain events."), CachedMoveDelta.Events.Num() > 0);
+
     Subsystem->ClearOutboundMessages();
 
     TestTrue(TEXT("Black resign should be accepted."),
@@ -204,6 +231,14 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
         FStupidChessErrorView ErrorPayload{};
         TestTrue(TEXT("Error payload should parse."), Subsystem->TryParseErrorMessage(*ErrorMessage, ErrorPayload));
         TestFalse(TEXT("Error message text should not be empty."), ErrorPayload.ErrorMessage.IsEmpty());
+
+        Subsystem->ResetParsedCache();
+        TestEqual(TEXT("Error cache parse count should be one."),
+                  Subsystem->ParseOutboundMessagesToCache(TArray<FStupidChessOutboundMessage>{*ErrorMessage}),
+                  1);
+        FStupidChessErrorView CachedError{};
+        TestTrue(TEXT("Cached error should be retrievable."), Subsystem->GetCachedError(CachedError));
+        TestFalse(TEXT("Cached error text should not be empty."), CachedError.ErrorMessage.IsEmpty());
     }
 
     Subsystem->Deinitialize();
@@ -274,6 +309,15 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
         TestTrue(TEXT("Rejected command ack should parse."), Subsystem->TryParseCommandAckMessage(*SetupPhasePassAck, CommandAck));
         TestFalse(TEXT("Rejected pass ack should be not accepted."), CommandAck.bAccepted);
         TestFalse(TEXT("Rejected pass ack should carry an error code."), CommandAck.ErrorCode.IsEmpty());
+
+        Subsystem->ResetParsedCache();
+        TestEqual(TEXT("Rejected pass cache parse count should be one."),
+                  Subsystem->ParseOutboundMessagesToCache(TArray<FStupidChessOutboundMessage>{*SetupPhasePassAck}),
+                  1);
+        FStupidChessCommandAckView CachedRejectedAck{};
+        TestTrue(TEXT("Rejected command ack should be retrievable from cache."),
+                 Subsystem->GetCachedCommandAck(CachedRejectedAck));
+        TestFalse(TEXT("Cached rejected pass ack should be not accepted."), CachedRejectedAck.bAccepted);
     }
 
     FStupidChessJoinAckView JoinAckView{};
@@ -295,6 +339,27 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
               Subsystem->TryParseCommandAckMessage(WrongTypeMessage, CommandAckView));
     TestFalse(TEXT("TryParseErrorMessage should reject non-error message."),
               Subsystem->TryParseErrorMessage(WrongTypeMessage, ErrorView));
+
+    Subsystem->ClearOutboundMessages();
+    TestFalse(TEXT("Invalid ack should be rejected and emit error."),
+              Subsystem->AckLocalEvents(MatchId, PlayerId, 99999));
+    const TArray<FStupidChessOutboundMessage> InvalidAckMessages = Subsystem->PullOutboundMessages(PlayerId);
+    const FStupidChessOutboundMessage* InvalidAckError = FindFirstMessageByType(
+        InvalidAckMessages,
+        EStupidChessProtocolMessageType::S2C_Error);
+    TestNotNull(TEXT("Invalid ack should emit error message."), InvalidAckError);
+    if (InvalidAckError != nullptr)
+    {
+        Subsystem->ResetParsedCache();
+        TestEqual(TEXT("Invalid ack error cache parse count should be one."),
+                  Subsystem->ParseOutboundMessagesToCache(TArray<FStupidChessOutboundMessage>{*InvalidAckError}),
+                  1);
+        FStupidChessErrorView CachedError{};
+        TestTrue(TEXT("Cached invalid-ack error should be retrievable."),
+                 Subsystem->GetCachedError(CachedError));
+        TestFalse(TEXT("Cached invalid-ack error text should not be empty."),
+                  CachedError.ErrorMessage.IsEmpty());
+    }
 
     Subsystem->Deinitialize();
     return true;

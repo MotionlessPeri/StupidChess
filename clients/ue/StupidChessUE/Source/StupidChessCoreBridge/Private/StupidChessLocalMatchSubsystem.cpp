@@ -109,6 +109,7 @@ void UStupidChessLocalMatchSubsystem::ResetLocalServer()
     delete ServerRuntime;
     ServerRuntime = new FStupidChessServerRuntime();
     NextClientSequence = 1;
+    ResetParsedCache();
 }
 
 bool UStupidChessLocalMatchSubsystem::JoinLocalMatch(int64 MatchId, int64 PlayerId)
@@ -326,6 +327,91 @@ void UStupidChessLocalMatchSubsystem::ClearOutboundMessages()
     }
 }
 
+void UStupidChessLocalMatchSubsystem::ResetParsedCache()
+{
+    bHasCachedJoinAck = false;
+    bHasCachedCommandAck = false;
+    bHasCachedError = false;
+    bHasCachedSnapshot = false;
+    bHasCachedEventDelta = false;
+    CachedJoinAck = FStupidChessJoinAckView{};
+    CachedCommandAck = FStupidChessCommandAckView{};
+    CachedError = FStupidChessErrorView{};
+    CachedSnapshot = FStupidChessSnapshotView{};
+    CachedEventDelta = FStupidChessEventDeltaView{};
+}
+
+int32 UStupidChessLocalMatchSubsystem::ParseOutboundMessagesToCache(const TArray<FStupidChessOutboundMessage>& Messages)
+{
+    int32 ParsedCount = 0;
+
+    for (const FStupidChessOutboundMessage& Message : Messages)
+    {
+        switch (Message.MessageType)
+        {
+        case EStupidChessProtocolMessageType::S2C_JoinAck:
+        {
+            FStupidChessJoinAckView ParsedJoinAck{};
+            if (TryParseJoinAckMessage(Message, ParsedJoinAck))
+            {
+                CachedJoinAck = MoveTemp(ParsedJoinAck);
+                bHasCachedJoinAck = true;
+                ++ParsedCount;
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_CommandAck:
+        {
+            FStupidChessCommandAckView ParsedCommandAck{};
+            if (TryParseCommandAckMessage(Message, ParsedCommandAck))
+            {
+                CachedCommandAck = MoveTemp(ParsedCommandAck);
+                bHasCachedCommandAck = true;
+                ++ParsedCount;
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_Error:
+        {
+            FStupidChessErrorView ParsedError{};
+            if (TryParseErrorMessage(Message, ParsedError))
+            {
+                CachedError = MoveTemp(ParsedError);
+                bHasCachedError = true;
+                ++ParsedCount;
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_Snapshot:
+        {
+            FStupidChessSnapshotView ParsedSnapshot{};
+            if (TryParseSnapshotMessage(Message, ParsedSnapshot))
+            {
+                CachedSnapshot = MoveTemp(ParsedSnapshot);
+                bHasCachedSnapshot = true;
+                ++ParsedCount;
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_EventDelta:
+        {
+            FStupidChessEventDeltaView ParsedEventDelta{};
+            if (TryParseEventDeltaMessage(Message, ParsedEventDelta))
+            {
+                CachedEventDelta = MoveTemp(ParsedEventDelta);
+                bHasCachedEventDelta = true;
+                ++ParsedCount;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    return ParsedCount;
+}
+
 bool UStupidChessLocalMatchSubsystem::DecodeJoinAckPayloadJson(const FString& PayloadJson, FStupidChessJoinAckView& OutJoinAck) const
 {
     FProtocolJoinAckPayload DecodedPayload{};
@@ -484,6 +570,61 @@ bool UStupidChessLocalMatchSubsystem::TryParseErrorMessage(const FStupidChessOut
     }
 
     return DecodeErrorPayloadJson(Message.PayloadJson, OutError);
+}
+
+bool UStupidChessLocalMatchSubsystem::GetCachedJoinAck(FStupidChessJoinAckView& OutJoinAck) const
+{
+    if (!bHasCachedJoinAck)
+    {
+        return false;
+    }
+
+    OutJoinAck = CachedJoinAck;
+    return true;
+}
+
+bool UStupidChessLocalMatchSubsystem::GetCachedCommandAck(FStupidChessCommandAckView& OutCommandAck) const
+{
+    if (!bHasCachedCommandAck)
+    {
+        return false;
+    }
+
+    OutCommandAck = CachedCommandAck;
+    return true;
+}
+
+bool UStupidChessLocalMatchSubsystem::GetCachedError(FStupidChessErrorView& OutError) const
+{
+    if (!bHasCachedError)
+    {
+        return false;
+    }
+
+    OutError = CachedError;
+    return true;
+}
+
+bool UStupidChessLocalMatchSubsystem::GetCachedSnapshot(FStupidChessSnapshotView& OutSnapshot) const
+{
+    if (!bHasCachedSnapshot)
+    {
+        return false;
+    }
+
+    OutSnapshot = CachedSnapshot;
+    return true;
+}
+
+bool UStupidChessLocalMatchSubsystem::GetCachedEventDelta(FStupidChessEventDeltaView& OutEventDelta) const
+{
+    if (!bHasCachedEventDelta)
+    {
+        return false;
+    }
+
+    OutEventDelta = CachedEventDelta;
+    return true;
 }
 
 int64 UStupidChessLocalMatchSubsystem::GetNextClientSequence() const

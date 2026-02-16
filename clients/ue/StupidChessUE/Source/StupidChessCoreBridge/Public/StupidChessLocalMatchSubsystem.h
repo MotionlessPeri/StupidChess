@@ -292,6 +292,12 @@ public:
     void ClearOutboundMessages();
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
+    void ResetParsedCache();
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
+    int32 ParseOutboundMessagesToCache(const TArray<FStupidChessOutboundMessage>& Messages);
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
     bool DecodeJoinAckPayloadJson(const FString& PayloadJson, FStupidChessJoinAckView& OutJoinAck) const;
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
@@ -322,6 +328,21 @@ public:
     bool TryParseErrorMessage(const FStupidChessOutboundMessage& Message, FStupidChessErrorView& OutError) const;
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    bool GetCachedJoinAck(FStupidChessJoinAckView& OutJoinAck) const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    bool GetCachedCommandAck(FStupidChessCommandAckView& OutCommandAck) const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    bool GetCachedError(FStupidChessErrorView& OutError) const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    bool GetCachedSnapshot(FStupidChessSnapshotView& OutSnapshot) const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    bool GetCachedEventDelta(FStupidChessEventDeltaView& OutEventDelta) const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     int64 GetNextClientSequence() const;
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
@@ -336,4 +357,14 @@ private:
 private:
     uint64 NextClientSequence = 1;
     FStupidChessServerRuntime* ServerRuntime = nullptr;
+    bool bHasCachedJoinAck = false;
+    bool bHasCachedCommandAck = false;
+    bool bHasCachedError = false;
+    bool bHasCachedSnapshot = false;
+    bool bHasCachedEventDelta = false;
+    FStupidChessJoinAckView CachedJoinAck{};
+    FStupidChessCommandAckView CachedCommandAck{};
+    FStupidChessErrorView CachedError{};
+    FStupidChessSnapshotView CachedSnapshot{};
+    FStupidChessEventDeltaView CachedEventDelta{};
 };

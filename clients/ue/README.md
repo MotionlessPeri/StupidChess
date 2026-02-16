@@ -27,17 +27,21 @@ UE 客户端实现目录。
 8. `SubmitMove`：封装 `C2S_Command(Move)`。
 9. `SubmitResign`：封装 `C2S_Command(Resign)`。
 10. `PullOutboundMessages`：按玩家拉取 `S2C` outbox 消息（返回 UE 结构体，含消息类型与 `PayloadJson`）。
-11. `DecodeJoinAckPayloadJson` / `DecodeCommandAckPayloadJson` / `DecodeErrorPayloadJson`：将常用确认/错误消息 JSON 解码为 UE 结构化视图。
-12. `DecodeSnapshotPayloadJson` / `DecodeEventDeltaPayloadJson`：将状态同步消息 JSON 解码为 UE 结构化视图。
-13. `TryParseJoinAckMessage` / `TryParseCommandAckMessage` / `TryParseErrorMessage`：按消息类型安全解析 outbox 确认与错误消息。
-14. `TryParseSnapshotMessage` / `TryParseEventDeltaMessage`：按消息类型安全解析 outbox 状态同步消息。
+11. `ResetParsedCache`：清空 subsystem 内部最近一次结构化解析缓存。
+12. `ParseOutboundMessagesToCache`：批量解析 outbox 消息并缓存最近一次 `JoinAck/CommandAck/Error/Snapshot/EventDelta`。
+13. `GetCachedJoinAck` / `GetCachedCommandAck` / `GetCachedError`：读取缓存确认/错误消息视图。
+14. `GetCachedSnapshot` / `GetCachedEventDelta`：读取缓存状态同步视图。
+15. `DecodeJoinAckPayloadJson` / `DecodeCommandAckPayloadJson` / `DecodeErrorPayloadJson`：将常用确认/错误消息 JSON 解码为 UE 结构化视图。
+16. `DecodeSnapshotPayloadJson` / `DecodeEventDeltaPayloadJson`：将状态同步消息 JSON 解码为 UE 结构化视图。
+17. `TryParseJoinAckMessage` / `TryParseCommandAckMessage` / `TryParseErrorMessage`：按消息类型安全解析 outbox 确认与错误消息。
+18. `TryParseSnapshotMessage` / `TryParseEventDeltaMessage`：按消息类型安全解析 outbox 状态同步消息。
 
 当前阶段保持协议 JSON 透传，便于先打通网络/状态闭环，再逐步引入更强类型化的 UE ViewModel。
 
 ## Automation Test
 
-1. `StupidChess.UE.CoreBridge.LocalFlow`：覆盖本地链路 `Join -> Commit/Reveal -> Move -> Resign -> AckError`，并验证 `TryParse*` 结构化解析接口。
-2. `StupidChess.UE.CoreBridge.ErrorPaths`：覆盖非法命令/非法 payload 路径（本地校验拒绝、服务端拒绝、JSON 解码失败）。
+1. `StupidChess.UE.CoreBridge.LocalFlow`：覆盖本地链路 `Join -> Commit/Reveal -> Move -> Resign -> AckError`，并验证 `TryParse* + ParsedCache` 结构化解析接口。
+2. `StupidChess.UE.CoreBridge.ErrorPaths`：覆盖非法命令/非法 payload 路径（本地校验拒绝、服务端拒绝、JSON 解码失败），并验证错误消息缓存解析。
 3. 运行方式（UE 5.7 示例）：
    - `UnrealEditor-Cmd.exe StupidChessUE.uproject -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow; Quit" -unattended -nop4 -nosplash -NullRHI`
    - `UnrealEditor-Cmd.exe StupidChessUE.uproject -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.ErrorPaths; Quit" -unattended -nop4 -nosplash -NullRHI`
