@@ -33,3 +33,9 @@ UE 客户端实现目录。
 14. `TryParseSnapshotMessage` / `TryParseEventDeltaMessage`：按消息类型安全解析 outbox 状态同步消息。
 
 当前阶段保持协议 JSON 透传，便于先打通网络/状态闭环，再逐步引入更强类型化的 UE ViewModel。
+
+## Automation Test
+
+1. `StupidChess.UE.CoreBridge.LocalFlow`：覆盖本地链路 `Join -> Commit/Reveal -> Move -> Resign -> AckError`，并验证 `TryParse*` 结构化解析接口。
+2. 运行方式（UE 5.7 示例）：
+   - `UnrealEditor-Cmd.exe StupidChessUE.uproject -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow; Quit" -unattended -nop4 -nosplash -NullRHI`

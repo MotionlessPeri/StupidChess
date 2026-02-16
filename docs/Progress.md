@@ -45,14 +45,17 @@
     - 新增 `DecodeJoinAckPayloadJson/DecodeCommandAckPayloadJson/DecodeErrorPayloadJson`。
     - 新增 `TryParseJoinAckMessage/TryParseCommandAckMessage/TryParseErrorMessage`。
     - 新增结构化视图模型：`FStupidChessJoinAckView`、`FStupidChessCommandAckView`、`FStupidChessErrorView`。
+19. UE bridge 自动化冒烟测试：
+    - 新增 `StupidChess.UE.CoreBridge.LocalFlow` 自动化用例。
+    - 覆盖 `Join -> Commit/Reveal -> Move -> Resign -> AckError` 全链路与 `TryParse*` 解析断言。
 
 ## In Progress
 
-1. 设计并实现 UE bridge 自测（不依赖 UI）以覆盖命令提交与 payload 解析（JoinAck/CommandAck/Error/Snapshot/EventDelta）的组合场景。
+1. 评估 UE 自动化测试在 CI/本地命令行的稳定运行参数（启动时间、渲染开销、日志输出）。
 
 ## Next Steps
 
-1. 增加 UE bridge 级最小回归用例（命令后 `S2C_CommandAck + Snapshot + EventDelta` 序列，含解析断言）。
+1. 增加第二条 UE bridge 用例：覆盖非法命令/非法 payload 的错误路径与错误码口径。
 2. 评估是否将结构化解析结果直接缓存为 subsystem 内部可订阅状态。
 3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 
@@ -60,3 +63,4 @@
 
 1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（37/37）。
 2. `Build.bat StupidChessUEEditor Win64 Development ...` 当前编译通过（UE 5.7）。
+3. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow;Quit"` 当前通过（EXIT CODE: 0）。
