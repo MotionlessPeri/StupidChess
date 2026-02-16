@@ -6,7 +6,7 @@
 
 ## Current Milestone
 
-1. 完成联网 PvP 服务端消息闭环（会话、房间、协议编解码、gateway、transport adapter），等待 UE 项目创建后接入。
+1. 完成 UE 侧最小桥接闭环（Join/PullSync/Ack + outbox 拉取），为后续命令接入与表现层绑定做准备。
 
 ## Completed
 
@@ -20,17 +20,43 @@
 8. `protocol` 编解码：`ProtocolCodec`（Envelope/Join/Command/PullSync/Ack/Snapshot/EventDelta/Error）。
 9. `server` 网关层：`FServerGateway`（`C2S` 消息解码与路由）。
 10. UE 版本控制基线：补充 UE 生成物 `.gitignore` 与内容资产 `.gitattributes`（Git LFS）规则。
+11. UE CoreBridge 模块接入：
+    - 新增 `StupidChessCoreBridge` 模块并挂入 `.uproject` 与 Targets。
+    - 在 UE 模块内编译共享 `core/protocol/server` 源（桥接编译单元）。
+    - 新增 `UStupidChessLocalMatchSubsystem`，暴露 `Join/PullSync/Ack` 与 outbox 拉取接口。
+12. UE 编译兼容修复：`EStupidChessProtocolMessageType` 增加 `Unknown=0`，满足 UHT 对 `UENUM` 默认值的要求。
+13. UE 编译修复：
+    - `protocol/src/ProtocolCodec.cpp` 的内部 JSON 节点类型重命名为 `FProtocolJsonValue`，避免与 UE 全局 `FJsonValue` 冲突。
+    - `UStupidChessLocalMatchSubsystem` 改为显式管理 `FStupidChessServerRuntime*` 生命周期，规避 UHT 生成单元中的不完整类型删除错误。
+14. UE 命令提交封装：
+    - `UStupidChessLocalMatchSubsystem` 新增 `SubmitCommitSetup/SubmitRevealSetup/SubmitPass`。
+    - `RevealSetup` 支持蓝图摆子结构 `FStupidChessSetupPlacement` 输入，并统一编码到 `C2S_Command`。
+15. UE 命令提交封装扩展：
+    - `UStupidChessLocalMatchSubsystem` 新增 `SubmitMove/SubmitResign`。
+    - 新增蓝图结构 `FStupidChessMoveCommand`，用于 `Move` 命令参数传递。
+16. gateway 回归增强：
+    - `ServerGatewayTests` 新增 battle phase 下 `Move` 与 `Resign` 路由用例。
+    - 断言 `S2C_CommandAck + S2C_Snapshot + S2C_EventDelta` 广播序列与终局状态字段。
+17. UE payload 解析层：
+    - `UStupidChessLocalMatchSubsystem` 新增 `DecodeSnapshotPayloadJson/DecodeEventDeltaPayloadJson`。
+    - 新增 `TryParseSnapshotMessage/TryParseEventDeltaMessage`，便于按消息类型安全解码。
+    - 新增结构化视图模型：`FStupidChessSnapshotView`、`FStupidChessEventDeltaView` 等。
+18. UE payload 解析层扩展：
+    - 新增 `DecodeJoinAckPayloadJson/DecodeCommandAckPayloadJson/DecodeErrorPayloadJson`。
+    - 新增 `TryParseJoinAckMessage/TryParseCommandAckMessage/TryParseErrorMessage`。
+    - 新增结构化视图模型：`FStupidChessJoinAckView`、`FStupidChessCommandAckView`、`FStupidChessErrorView`。
 
 ## In Progress
 
-1. 等待你确认 UE 项目目录清单后，开始 UE 客户端 `Join/Sync/Ack` 最小接入。
+1. 设计并实现 UE bridge 自测（不依赖 UI）以覆盖命令提交与 payload 解析（JoinAck/CommandAck/Error/Snapshot/EventDelta）的组合场景。
 
 ## Next Steps
 
-1. 你创建 UE 项目后，接入 `Join/Sync/Ack` 最小闭环。
-2. 增加 “命令后双端同步一致” 的回放式集成测试。
+1. 增加 UE bridge 级最小回归用例（命令后 `S2C_CommandAck + Snapshot + EventDelta` 序列，含解析断言）。
+2. 评估是否将结构化解析结果直接缓存为 subsystem 内部可订阅状态。
 3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 
 ## Test Baseline
 
-1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（35/35）。
+1. `ctest --preset vcpkg-debug-test --output-on-failure` 当前为全通过（37/37）。
+2. `Build.bat StupidChessUEEditor Win64 Development ...` 当前编译通过（UE 5.7）。

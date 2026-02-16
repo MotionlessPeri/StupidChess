@@ -8,6 +8,11 @@
 			"Name": "StupidChessUE",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "StupidChessCoreBridge",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [

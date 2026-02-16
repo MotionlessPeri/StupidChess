@@ -21,14 +21,14 @@ enum class EJsonType : uint8_t
     Object
 };
 
-struct FJsonValue
+struct FProtocolJsonValue
 {
     EJsonType Type = EJsonType::Null;
     bool BoolValue = false;
     int64_t NumberValue = 0;
     std::string StringValue;
-    std::vector<FJsonValue> ArrayValue;
-    std::unordered_map<std::string, FJsonValue> ObjectValue;
+    std::vector<FProtocolJsonValue> ArrayValue;
+    std::unordered_map<std::string, FProtocolJsonValue> ObjectValue;
 };
 
 class FJsonParser
@@ -39,7 +39,7 @@ public:
     {
     }
 
-    bool Parse(FJsonValue& OutValue)
+    bool Parse(FProtocolJsonValue& OutValue)
     {
         SkipWhitespace();
         if (!ParseValue(OutValue))
@@ -52,7 +52,7 @@ public:
     }
 
 private:
-    bool ParseValue(FJsonValue& OutValue)
+    bool ParseValue(FProtocolJsonValue& OutValue)
     {
         if (Index >= Text.size())
         {
@@ -99,7 +99,7 @@ private:
         return false;
     }
 
-    bool ParseObject(FJsonValue& OutValue)
+    bool ParseObject(FProtocolJsonValue& OutValue)
     {
         if (!Consume('{'))
         {
@@ -129,7 +129,7 @@ private:
                 return false;
             }
 
-            FJsonValue Value;
+            FProtocolJsonValue Value;
             SkipWhitespace();
             if (!ParseValue(Value))
             {
@@ -151,7 +151,7 @@ private:
         }
     }
 
-    bool ParseArray(FJsonValue& OutValue)
+    bool ParseArray(FProtocolJsonValue& OutValue)
     {
         if (!Consume('['))
         {
@@ -169,7 +169,7 @@ private:
 
         while (true)
         {
-            FJsonValue Element;
+            FProtocolJsonValue Element;
             if (!ParseValue(Element))
             {
                 return false;
@@ -345,7 +345,7 @@ void AppendQuoted(std::ostringstream& Stream, std::string_view Text)
     Stream << '"' << EscapeJson(Text) << '"';
 }
 
-bool ParseJsonRootObject(const std::string& Json, FJsonValue& OutRoot)
+bool ParseJsonRootObject(const std::string& Json, FProtocolJsonValue& OutRoot)
 {
     FJsonParser Parser(Json);
     if (!Parser.Parse(OutRoot))
@@ -356,7 +356,7 @@ bool ParseJsonRootObject(const std::string& Json, FJsonValue& OutRoot)
     return OutRoot.Type == EJsonType::Object;
 }
 
-const FJsonValue* FindField(const FJsonValue& ObjectValue, const char* FieldName)
+const FProtocolJsonValue* FindField(const FProtocolJsonValue& ObjectValue, const char* FieldName)
 {
     if (ObjectValue.Type != EJsonType::Object)
     {
@@ -372,9 +372,9 @@ const FJsonValue* FindField(const FJsonValue& ObjectValue, const char* FieldName
     return &It->second;
 }
 
-bool ReadInt(const FJsonValue& ObjectValue, const char* FieldName, int64_t& OutValue)
+bool ReadInt(const FProtocolJsonValue& ObjectValue, const char* FieldName, int64_t& OutValue)
 {
-    const FJsonValue* FieldValue = FindField(ObjectValue, FieldName);
+    const FProtocolJsonValue* FieldValue = FindField(ObjectValue, FieldName);
     if (FieldValue == nullptr || FieldValue->Type != EJsonType::Number)
     {
         return false;
@@ -384,9 +384,9 @@ bool ReadInt(const FJsonValue& ObjectValue, const char* FieldName, int64_t& OutV
     return true;
 }
 
-bool ReadBool(const FJsonValue& ObjectValue, const char* FieldName, bool& OutValue)
+bool ReadBool(const FProtocolJsonValue& ObjectValue, const char* FieldName, bool& OutValue)
 {
-    const FJsonValue* FieldValue = FindField(ObjectValue, FieldName);
+    const FProtocolJsonValue* FieldValue = FindField(ObjectValue, FieldName);
     if (FieldValue == nullptr || FieldValue->Type != EJsonType::Bool)
     {
         return false;
@@ -396,9 +396,9 @@ bool ReadBool(const FJsonValue& ObjectValue, const char* FieldName, bool& OutVal
     return true;
 }
 
-bool ReadString(const FJsonValue& ObjectValue, const char* FieldName, std::string& OutValue)
+bool ReadString(const FProtocolJsonValue& ObjectValue, const char* FieldName, std::string& OutValue)
 {
-    const FJsonValue* FieldValue = FindField(ObjectValue, FieldName);
+    const FProtocolJsonValue* FieldValue = FindField(ObjectValue, FieldName);
     if (FieldValue == nullptr || FieldValue->Type != EJsonType::String)
     {
         return false;
@@ -408,9 +408,9 @@ bool ReadString(const FJsonValue& ObjectValue, const char* FieldName, std::strin
     return true;
 }
 
-bool ReadObject(const FJsonValue& ObjectValue, const char* FieldName, const FJsonValue*& OutObject)
+bool ReadObject(const FProtocolJsonValue& ObjectValue, const char* FieldName, const FProtocolJsonValue*& OutObject)
 {
-    const FJsonValue* FieldValue = FindField(ObjectValue, FieldName);
+    const FProtocolJsonValue* FieldValue = FindField(ObjectValue, FieldName);
     if (FieldValue == nullptr || FieldValue->Type != EJsonType::Object)
     {
         return false;
@@ -420,9 +420,9 @@ bool ReadObject(const FJsonValue& ObjectValue, const char* FieldName, const FJso
     return true;
 }
 
-bool ReadArray(const FJsonValue& ObjectValue, const char* FieldName, const FJsonValue*& OutArray)
+bool ReadArray(const FProtocolJsonValue& ObjectValue, const char* FieldName, const FProtocolJsonValue*& OutArray)
 {
-    const FJsonValue* FieldValue = FindField(ObjectValue, FieldName);
+    const FProtocolJsonValue* FieldValue = FindField(ObjectValue, FieldName);
     if (FieldValue == nullptr || FieldValue->Type != EJsonType::Array)
     {
         return false;
@@ -452,7 +452,7 @@ bool EncodeEnvelope(const FProtocolEnvelope& Envelope, std::string& OutJson)
 
 bool DecodeEnvelope(const std::string& Json, FProtocolEnvelope& OutEnvelope)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -486,7 +486,7 @@ bool EncodeJoinPayload(const FProtocolJoinPayload& Payload, std::string& OutJson
 
 bool DecodeJoinPayload(const std::string& Json, FProtocolJoinPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -562,7 +562,7 @@ bool EncodeCommandPayload(const FProtocolCommandPayload& Payload, std::string& O
 
 bool DecodeCommandPayload(const std::string& Json, FProtocolCommandPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -591,7 +591,7 @@ bool DecodeCommandPayload(const std::string& Json, FProtocolCommandPayload& OutP
 
     if (OutPayload.bHasMove)
     {
-        const FJsonValue* MoveObject = nullptr;
+        const FProtocolJsonValue* MoveObject = nullptr;
         if (!ReadObject(Root, "move", MoveObject))
         {
             return false;
@@ -624,7 +624,7 @@ bool DecodeCommandPayload(const std::string& Json, FProtocolCommandPayload& OutP
 
     if (OutPayload.bHasSetupCommit)
     {
-        const FJsonValue* SetupCommitObject = nullptr;
+        const FProtocolJsonValue* SetupCommitObject = nullptr;
         if (!ReadObject(Root, "setupCommit", SetupCommitObject))
         {
             return false;
@@ -642,14 +642,14 @@ bool DecodeCommandPayload(const std::string& Json, FProtocolCommandPayload& OutP
 
     if (OutPayload.bHasSetupPlain)
     {
-        const FJsonValue* SetupPlainObject = nullptr;
+        const FProtocolJsonValue* SetupPlainObject = nullptr;
         if (!ReadObject(Root, "setupPlain", SetupPlainObject))
         {
             return false;
         }
 
         int64_t SetupPlainSide = 0;
-        const FJsonValue* PlacementsArray = nullptr;
+        const FProtocolJsonValue* PlacementsArray = nullptr;
         if (!ReadInt(*SetupPlainObject, "side", SetupPlainSide) ||
             !ReadString(*SetupPlainObject, "nonce", OutPayload.SetupPlain.Nonce) ||
             !ReadArray(*SetupPlainObject, "placements", PlacementsArray))
@@ -660,7 +660,7 @@ bool DecodeCommandPayload(const std::string& Json, FProtocolCommandPayload& OutP
         OutPayload.SetupPlain.Side = static_cast<int32_t>(SetupPlainSide);
         OutPayload.SetupPlain.Placements.clear();
         OutPayload.SetupPlain.Placements.reserve(PlacementsArray->ArrayValue.size());
-        for (const FJsonValue& PlacementValue : PlacementsArray->ArrayValue)
+        for (const FProtocolJsonValue& PlacementValue : PlacementsArray->ArrayValue)
         {
             int64_t PieceIdValue = 0;
             int64_t X = 0;
@@ -695,7 +695,7 @@ bool EncodePullSyncPayload(const FProtocolPullSyncPayload& Payload, std::string&
 
 bool DecodePullSyncPayload(const std::string& Json, FProtocolPullSyncPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -727,7 +727,7 @@ bool EncodeAckPayload(const FProtocolAckPayload& Payload, std::string& OutJson)
 
 bool DecodeAckPayload(const std::string& Json, FProtocolAckPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -761,7 +761,7 @@ bool EncodeJoinAckPayload(const FProtocolJoinAckPayload& Payload, std::string& O
 
 bool DecodeJoinAckPayload(const std::string& Json, FProtocolJoinAckPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -795,7 +795,7 @@ bool EncodeCommandAckPayload(const FProtocolCommandAckPayload& Payload, std::str
 
 bool DecodeCommandAckPayload(const std::string& Json, FProtocolCommandAckPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -842,7 +842,7 @@ bool EncodeSnapshotPayload(const FProtocolSnapshotPayload& Payload, std::string&
 
 bool DecodeSnapshotPayload(const std::string& Json, FProtocolSnapshotPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -856,7 +856,7 @@ bool DecodeSnapshotPayload(const std::string& Json, FProtocolSnapshotPayload& Ou
     int64_t EndReason = 0;
     int64_t TurnIndex = 0;
     int64_t LastEventSequence = 0;
-    const FJsonValue* PiecesArray = nullptr;
+    const FProtocolJsonValue* PiecesArray = nullptr;
     if (!ReadInt(Root, "viewerSide", ViewerSide) ||
         !ReadInt(Root, "phase", Phase) ||
         !ReadInt(Root, "currentTurn", CurrentTurn) ||
@@ -880,7 +880,7 @@ bool DecodeSnapshotPayload(const std::string& Json, FProtocolSnapshotPayload& Ou
     OutPayload.LastEventSequence = static_cast<uint64_t>(LastEventSequence);
     OutPayload.Pieces.clear();
     OutPayload.Pieces.reserve(PiecesArray->ArrayValue.size());
-    for (const FJsonValue& PieceValue : PiecesArray->ArrayValue)
+    for (const FProtocolJsonValue& PieceValue : PiecesArray->ArrayValue)
     {
         int64_t PieceId = 0;
         int64_t Side = 0;
@@ -946,7 +946,7 @@ bool EncodeEventDeltaPayload(const FProtocolEventDeltaPayload& Payload, std::str
 
 bool DecodeEventDeltaPayload(const std::string& Json, FProtocolEventDeltaPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -954,7 +954,7 @@ bool DecodeEventDeltaPayload(const std::string& Json, FProtocolEventDeltaPayload
 
     int64_t RequestedAfterSequence = 0;
     int64_t LatestSequence = 0;
-    const FJsonValue* EventsArray = nullptr;
+    const FProtocolJsonValue* EventsArray = nullptr;
     if (!ReadInt(Root, "requestedAfterSequence", RequestedAfterSequence) ||
         !ReadInt(Root, "latestSequence", LatestSequence) ||
         !ReadArray(Root, "events", EventsArray))
@@ -966,7 +966,7 @@ bool DecodeEventDeltaPayload(const std::string& Json, FProtocolEventDeltaPayload
     OutPayload.LatestSequence = static_cast<uint64_t>(LatestSequence);
     OutPayload.Events.clear();
     OutPayload.Events.reserve(EventsArray->ArrayValue.size());
-    for (const FJsonValue& EventValue : EventsArray->ArrayValue)
+    for (const FProtocolJsonValue& EventValue : EventsArray->ArrayValue)
     {
         int64_t Sequence = 0;
         int64_t TurnIndex = 0;
@@ -1008,7 +1008,7 @@ bool EncodeErrorPayload(const FProtocolErrorPayload& Payload, std::string& OutJs
 
 bool DecodeErrorPayload(const std::string& Json, FProtocolErrorPayload& OutPayload)
 {
-    FJsonValue Root;
+    FProtocolJsonValue Root;
     if (!ParseJsonRootObject(Json, Root))
     {
         return false;
@@ -1017,3 +1017,4 @@ bool DecodeErrorPayload(const std::string& Json, FProtocolErrorPayload& OutPaylo
     return ReadString(Root, "errorMessage", OutPayload.ErrorMessage);
 }
 }
+
