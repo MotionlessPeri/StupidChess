@@ -241,6 +241,12 @@ struct FStupidChessEventDeltaView
     TArray<FStupidChessEventRecordView> Events;
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessJoinAckParsedDelegate, const FStupidChessJoinAckView&, JoinAck);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessCommandAckParsedDelegate, const FStupidChessCommandAckView&, CommandAck);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessErrorParsedDelegate, const FStupidChessErrorView&, Error);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessSnapshotParsedDelegate, const FStupidChessSnapshotView&, Snapshot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FStupidChessEventDeltaParsedDelegate, const FStupidChessEventDeltaView&, EventDelta);
+
 struct FStupidChessServerRuntime;
 struct FProtocolCommandPayload;
 
@@ -250,6 +256,21 @@ class STUPIDCHESSCOREBRIDGE_API UStupidChessLocalMatchSubsystem : public UGameIn
     GENERATED_BODY()
 
 public:
+    UPROPERTY(BlueprintAssignable, Category = "StupidChess|Server|Events")
+    FStupidChessJoinAckParsedDelegate OnJoinAckParsed;
+
+    UPROPERTY(BlueprintAssignable, Category = "StupidChess|Server|Events")
+    FStupidChessCommandAckParsedDelegate OnCommandAckParsed;
+
+    UPROPERTY(BlueprintAssignable, Category = "StupidChess|Server|Events")
+    FStupidChessErrorParsedDelegate OnErrorParsed;
+
+    UPROPERTY(BlueprintAssignable, Category = "StupidChess|Server|Events")
+    FStupidChessSnapshotParsedDelegate OnSnapshotParsed;
+
+    UPROPERTY(BlueprintAssignable, Category = "StupidChess|Server|Events")
+    FStupidChessEventDeltaParsedDelegate OnEventDeltaParsed;
+
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
     virtual void Deinitialize() override;
 
@@ -296,6 +317,15 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
     int32 ParseOutboundMessagesToCache(const TArray<FStupidChessOutboundMessage>& Messages);
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
+    int32 PullParseAndDispatchOutboundMessages(int64 PlayerId, int64 AfterServerSequence = 0);
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    TArray<FStupidChessOutboundMessage> GetLastPulledMessages() const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    int32 GetLastPulledMessageCount() const;
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
     bool DecodeJoinAckPayloadJson(const FString& PayloadJson, FStupidChessJoinAckView& OutJoinAck) const;
@@ -357,6 +387,7 @@ private:
 private:
     uint64 NextClientSequence = 1;
     FStupidChessServerRuntime* ServerRuntime = nullptr;
+    TArray<FStupidChessOutboundMessage> LastPulledMessages;
     bool bHasCachedJoinAck = false;
     bool bHasCachedCommandAck = false;
     bool bHasCachedError = false;

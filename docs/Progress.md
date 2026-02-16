@@ -54,15 +54,20 @@
 21. UE bridge 解析缓存能力：
     - `UStupidChessLocalMatchSubsystem` 新增 `ResetParsedCache/ParseOutboundMessagesToCache` 与 `GetCached*` 接口。
     - `LocalFlow` 与 `ErrorPaths` 自动化用例新增缓存读取断言（确认/快照/增量/错误消息）。
+22. UE bridge 消息派发入口：
+    - 新增 `PullParseAndDispatchOutboundMessages`，支持一次调用完成拉取、缓存更新与事件分发。
+    - 新增 `BlueprintAssignable` 事件：`OnJoinAckParsed/OnCommandAckParsed/OnErrorParsed/OnSnapshotParsed/OnEventDeltaParsed`。
+    - 新增 `GetLastPulledMessages/GetLastPulledMessageCount`，便于表现层在事件回调后读取原始批次。
+    - 自动化用例迁移到新入口，覆盖 `Join/Move/InvalidAck` 路径。
 
 ## In Progress
 
-1. 评估 UE bridge 消息派发/订阅接口设计（减少 UI 侧轮询 outbox）。
+1. 准备 UE 项目内的蓝图接线模板（GameInstance/Widget 订阅 `On*Parsed`，驱动 UI 状态更新）。
 
 ## Next Steps
 
-1. 在 `UStupidChessLocalMatchSubsystem` 增加消息事件分发 API（BlueprintAssignable 或委托）。
-2. 将 `ParsedCache` 与事件分发打通，支持 UI 直接绑定“最近消息”。
+1. 在 UE 工程内创建最小蓝图样例（加入房间、提交命令、订阅 `On*Parsed` 更新文本/棋盘状态）。
+2. 为 `GameOver` 增加结构化视图与解析/派发支持，补齐当前 `S2C_GameOver` 空白路径。
 3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
 
 ## Test Baseline

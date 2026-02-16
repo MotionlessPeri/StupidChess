@@ -109,6 +109,7 @@ void UStupidChessLocalMatchSubsystem::ResetLocalServer()
     delete ServerRuntime;
     ServerRuntime = new FStupidChessServerRuntime();
     NextClientSequence = 1;
+    LastPulledMessages.Reset();
     ResetParsedCache();
 }
 
@@ -325,6 +326,8 @@ void UStupidChessLocalMatchSubsystem::ClearOutboundMessages()
     {
         ServerRuntime->MessageSink.Clear();
     }
+
+    LastPulledMessages.Reset();
 }
 
 void UStupidChessLocalMatchSubsystem::ResetParsedCache()
@@ -410,6 +413,84 @@ int32 UStupidChessLocalMatchSubsystem::ParseOutboundMessagesToCache(const TArray
     }
 
     return ParsedCount;
+}
+
+int32 UStupidChessLocalMatchSubsystem::PullParseAndDispatchOutboundMessages(int64 PlayerId, int64 AfterServerSequence)
+{
+    LastPulledMessages = PullOutboundMessages(PlayerId, AfterServerSequence);
+    ResetParsedCache();
+
+    const int32 ParsedCount = ParseOutboundMessagesToCache(LastPulledMessages);
+    if (ParsedCount <= 0)
+    {
+        return 0;
+    }
+
+    for (const FStupidChessOutboundMessage& Message : LastPulledMessages)
+    {
+        switch (Message.MessageType)
+        {
+        case EStupidChessProtocolMessageType::S2C_JoinAck:
+        {
+            FStupidChessJoinAckView ParsedJoinAck{};
+            if (TryParseJoinAckMessage(Message, ParsedJoinAck))
+            {
+                OnJoinAckParsed.Broadcast(ParsedJoinAck);
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_CommandAck:
+        {
+            FStupidChessCommandAckView ParsedCommandAck{};
+            if (TryParseCommandAckMessage(Message, ParsedCommandAck))
+            {
+                OnCommandAckParsed.Broadcast(ParsedCommandAck);
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_Error:
+        {
+            FStupidChessErrorView ParsedError{};
+            if (TryParseErrorMessage(Message, ParsedError))
+            {
+                OnErrorParsed.Broadcast(ParsedError);
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_Snapshot:
+        {
+            FStupidChessSnapshotView ParsedSnapshot{};
+            if (TryParseSnapshotMessage(Message, ParsedSnapshot))
+            {
+                OnSnapshotParsed.Broadcast(ParsedSnapshot);
+            }
+            break;
+        }
+        case EStupidChessProtocolMessageType::S2C_EventDelta:
+        {
+            FStupidChessEventDeltaView ParsedEventDelta{};
+            if (TryParseEventDeltaMessage(Message, ParsedEventDelta))
+            {
+                OnEventDeltaParsed.Broadcast(ParsedEventDelta);
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    return ParsedCount;
+}
+
+TArray<FStupidChessOutboundMessage> UStupidChessLocalMatchSubsystem::GetLastPulledMessages() const
+{
+    return LastPulledMessages;
+}
+
+int32 UStupidChessLocalMatchSubsystem::GetLastPulledMessageCount() const
+{
+    return LastPulledMessages.Num();
 }
 
 bool UStupidChessLocalMatchSubsystem::DecodeJoinAckPayloadJson(const FString& PayloadJson, FStupidChessJoinAckView& OutJoinAck) const

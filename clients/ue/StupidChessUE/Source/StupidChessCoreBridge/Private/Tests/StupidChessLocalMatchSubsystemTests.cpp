@@ -108,7 +108,12 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
     Subsystem->ClearOutboundMessages();
 
     TestTrue(TEXT("Black join should be accepted."), Subsystem->JoinLocalMatch(MatchId, BlackPlayerId));
-    const TArray<FStupidChessOutboundMessage> BlackJoinMessages = Subsystem->PullOutboundMessages(BlackPlayerId);
+    const int32 BlackJoinParsedCount = Subsystem->PullParseAndDispatchOutboundMessages(BlackPlayerId);
+    TestTrue(TEXT("Black join pull-parse-dispatch should parse at least one message."),
+             BlackJoinParsedCount >= 1);
+    TestTrue(TEXT("Black join should pull at least one outbound message."),
+             Subsystem->GetLastPulledMessageCount() >= 1);
+    const TArray<FStupidChessOutboundMessage> BlackJoinMessages = Subsystem->GetLastPulledMessages();
     const FStupidChessOutboundMessage* BlackJoinAckMessage = FindFirstMessageByType(
         BlackJoinMessages,
         EStupidChessProtocolMessageType::S2C_JoinAck);
@@ -143,7 +148,10 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Red move should be accepted."),
              Subsystem->SubmitMove(MatchId, RedPlayerId, EStupidChessSide::Red, Move));
 
-    const TArray<FStupidChessOutboundMessage> RedMoveMessages = Subsystem->PullOutboundMessages(RedPlayerId);
+    TestEqual(TEXT("Move pull-parse-dispatch should parse three messages."),
+              Subsystem->PullParseAndDispatchOutboundMessages(RedPlayerId),
+              3);
+    const TArray<FStupidChessOutboundMessage> RedMoveMessages = Subsystem->GetLastPulledMessages();
     const FStupidChessOutboundMessage* RedCommandAckMessage = FindFirstMessageByType(
         RedMoveMessages,
         EStupidChessProtocolMessageType::S2C_CommandAck);
@@ -179,10 +187,6 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Move should append at least one event."), Delta.Events.Num() > 0);
     }
 
-    Subsystem->ResetParsedCache();
-    TestEqual(TEXT("Move response cache parse count should be three."),
-              Subsystem->ParseOutboundMessagesToCache(RedMoveMessages),
-              3);
     FStupidChessCommandAckView CachedMoveAck{};
     TestTrue(TEXT("Cached command ack should be available after move response."),
              Subsystem->GetCachedCommandAck(CachedMoveAck));
@@ -220,7 +224,10 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
     Subsystem->ClearOutboundMessages();
 
     TestFalse(TEXT("Invalid ack should be rejected."), Subsystem->AckLocalEvents(MatchId, RedPlayerId, 99999));
-    const TArray<FStupidChessOutboundMessage> ErrorMessages = Subsystem->PullOutboundMessages(RedPlayerId);
+    TestEqual(TEXT("Invalid ack pull-parse-dispatch should parse one error message."),
+              Subsystem->PullParseAndDispatchOutboundMessages(RedPlayerId),
+              1);
+    const TArray<FStupidChessOutboundMessage> ErrorMessages = Subsystem->GetLastPulledMessages();
     const FStupidChessOutboundMessage* ErrorMessage = FindFirstMessageByType(
         ErrorMessages,
         EStupidChessProtocolMessageType::S2C_Error);
@@ -232,10 +239,6 @@ bool FStupidChessLocalMatchSubsystemFlowTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Error payload should parse."), Subsystem->TryParseErrorMessage(*ErrorMessage, ErrorPayload));
         TestFalse(TEXT("Error message text should not be empty."), ErrorPayload.ErrorMessage.IsEmpty());
 
-        Subsystem->ResetParsedCache();
-        TestEqual(TEXT("Error cache parse count should be one."),
-                  Subsystem->ParseOutboundMessagesToCache(TArray<FStupidChessOutboundMessage>{*ErrorMessage}),
-                  1);
         FStupidChessErrorView CachedError{};
         TestTrue(TEXT("Cached error should be retrievable."), Subsystem->GetCachedError(CachedError));
         TestFalse(TEXT("Cached error text should not be empty."), CachedError.ErrorMessage.IsEmpty());
@@ -298,7 +301,10 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
 
     TestFalse(TEXT("Pass in setup phase should be rejected by server."),
               Subsystem->SubmitPass(MatchId, PlayerId, EStupidChessSide::Red));
-    const TArray<FStupidChessOutboundMessage> SetupPhasePassMessages = Subsystem->PullOutboundMessages(PlayerId);
+    TestEqual(TEXT("Rejected pass pull-parse-dispatch should parse one command-ack."),
+              Subsystem->PullParseAndDispatchOutboundMessages(PlayerId),
+              1);
+    const TArray<FStupidChessOutboundMessage> SetupPhasePassMessages = Subsystem->GetLastPulledMessages();
     const FStupidChessOutboundMessage* SetupPhasePassAck = FindFirstMessageByType(
         SetupPhasePassMessages,
         EStupidChessProtocolMessageType::S2C_CommandAck);
@@ -310,10 +316,6 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
         TestFalse(TEXT("Rejected pass ack should be not accepted."), CommandAck.bAccepted);
         TestFalse(TEXT("Rejected pass ack should carry an error code."), CommandAck.ErrorCode.IsEmpty());
 
-        Subsystem->ResetParsedCache();
-        TestEqual(TEXT("Rejected pass cache parse count should be one."),
-                  Subsystem->ParseOutboundMessagesToCache(TArray<FStupidChessOutboundMessage>{*SetupPhasePassAck}),
-                  1);
         FStupidChessCommandAckView CachedRejectedAck{};
         TestTrue(TEXT("Rejected command ack should be retrievable from cache."),
                  Subsystem->GetCachedCommandAck(CachedRejectedAck));
@@ -343,17 +345,16 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
     Subsystem->ClearOutboundMessages();
     TestFalse(TEXT("Invalid ack should be rejected and emit error."),
               Subsystem->AckLocalEvents(MatchId, PlayerId, 99999));
-    const TArray<FStupidChessOutboundMessage> InvalidAckMessages = Subsystem->PullOutboundMessages(PlayerId);
+    TestEqual(TEXT("Invalid ack pull-parse-dispatch should parse one error."),
+              Subsystem->PullParseAndDispatchOutboundMessages(PlayerId),
+              1);
+    const TArray<FStupidChessOutboundMessage> InvalidAckMessages = Subsystem->GetLastPulledMessages();
     const FStupidChessOutboundMessage* InvalidAckError = FindFirstMessageByType(
         InvalidAckMessages,
         EStupidChessProtocolMessageType::S2C_Error);
     TestNotNull(TEXT("Invalid ack should emit error message."), InvalidAckError);
     if (InvalidAckError != nullptr)
     {
-        Subsystem->ResetParsedCache();
-        TestEqual(TEXT("Invalid ack error cache parse count should be one."),
-                  Subsystem->ParseOutboundMessagesToCache(TArray<FStupidChessOutboundMessage>{*InvalidAckError}),
-                  1);
         FStupidChessErrorView CachedError{};
         TestTrue(TEXT("Cached invalid-ack error should be retrievable."),
                  Subsystem->GetCachedError(CachedError));
