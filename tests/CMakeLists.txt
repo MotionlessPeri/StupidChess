@@ -13,6 +13,7 @@ add_executable(StupidChessCoreTests
   CoreSmokeTests.cpp
   MatchSessionTests.cpp
   MatchServiceTests.cpp
+  ProtocolMapperTests.cpp
 )
 
 target_compile_features(StupidChessCoreTests PRIVATE cxx_std_20)

@@ -1,4 +1,5 @@
 #include "Server/MatchService.h"
+#include "Server/ProtocolMapper.h"
 
 #include <iostream>
 
@@ -17,9 +18,10 @@ int main()
     }
 
     const FMatchSyncResponse RedSync = Service.PullPlayerSync(1001);
+    const FProtocolSyncBundle Bundle = FProtocolMapper::BuildSyncBundle(RedSync);
     std::cout << "Session initialized with two players. Current phase="
-              << static_cast<int>(RedSync.View.Phase)
-              << " events=" << RedSync.Events.size() << std::endl;
+              << Bundle.Snapshot.Phase
+              << " events=" << Bundle.EventDelta.Events.size() << std::endl;
 
     return 0;
 }

@@ -13,3 +13,4 @@
 1. `S2C_Snapshot` 只表达当前视角可见棋盘状态，不包含对手隐藏真值。
 2. `S2C_EventDelta` 以 `RequestedAfterSequence` 和 `LatestSequence` 进行断线续拉。
 3. 当前仅定义 DTO，不绑定具体序列化协议（JSON/二进制后续在 adapter 决策）。
+4. DTO 的组包职责在 `server` 侧 `FProtocolMapper`，避免规则层与协议层直接耦合。

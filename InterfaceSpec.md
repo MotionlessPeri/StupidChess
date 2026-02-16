@@ -554,6 +554,17 @@ struct FProtocolEventDeltaPayload
     uint64_t LatestSequence = 0;
     std::vector<FProtocolEventRecordPayload> Events;
 };
+
+class IProtocolMapper
+{
+public:
+    virtual ~IProtocolMapper() = default;
+
+    virtual FProtocolJoinAckPayload BuildJoinAckPayload(const FMatchJoinResponse& JoinResponse) const = 0;
+    virtual FProtocolCommandAckPayload BuildCommandAckPayload(const FCommandResult& CommandResult) const = 0;
+    virtual FProtocolSnapshotPayload BuildSnapshotPayload(const FMatchPlayerView& View, uint64_t LastEventSequence) const = 0;
+    virtual FProtocolEventDeltaPayload BuildEventDeltaPayload(const FMatchSyncResponse& SyncResponse) const = 0;
+};
 ```
 
 消息约定：
