@@ -2,11 +2,11 @@
 
 ## Last Updated
 
-1. 2026-02-16
+1. 2026-02-17
 
 ## Current Milestone
 
-1. 完成 UE 侧桥接可消费化（结构化解析 + 解析缓存），为蓝图绑定和消息派发层做准备。
+1. 稳定化 UE MCP 蓝图自动接线流程（可清图、可重建、可编译校验）。
 
 ## Completed
 
@@ -19,7 +19,7 @@
 7. `server` transport 骨架：`FServerTransportAdapter + FInMemoryServerMessageSink`（Join/Command/PullSync/Ack 下发路径）。
 8. `protocol` 编解码：`ProtocolCodec`（Envelope/Join/Command/PullSync/Ack/Snapshot/EventDelta/Error）。
 9. `server` 网关层：`FServerGateway`（`C2S` 消息解码与路由）。
-10. UE 版本控制基线：补充 UE 生成物 `.gitignore` 与内容资产 `.gitattributes`（Git LFS）规则。
+10. UE 版本控制基线：补充 UE 生成物 `.gitignore` 与内容资产 `.gitattributes`（二进制）规则。
 11. UE CoreBridge 模块接入：
     - 新增 `StupidChessCoreBridge` 模块并挂入 `.uproject` 与 Targets。
     - 在 UE 模块内编译共享 `core/protocol/server` 源（桥接编译单元）。
@@ -69,16 +69,58 @@
 25. UE 蓝图接线预制能力：
     - `UStupidChessLocalMatchSubsystem` 新增 `BuildStandardSetupPlacements`，直接产出标准 16 子摆法（含红黑镜像）。
     - 新增 `clients/ue/BlueprintQuickStart.md`，提供最小本地联调蓝图模板（Join/CommitReveal/Move/Resign/Pull）。
+26. UE MCP 蓝图探测流程沉淀：
+    - 新增 `clients/ue/McpBlueprintWorkflow.md`，固化蓝图可读信息、不可达边界、直连诊断与故障排查。
+    - `AGENTS.md` 增加约定：涉及 UE 蓝图自动化探测时先复用该文档流程。
+27. UE MCP 工具链切换到 `chongdashu/unreal-mcp`：
+    - Codex MCP 配置切换到本地 Python server。
+    - UE 项目新增 `Plugins/UnrealMCP`，并在 `StupidChessUE.uproject` 启用。
+    - 修复 UE5.7 编译兼容：`ANY_PACKAGE` 兼容宏、`MCPServerRunnable.cpp` 缓冲常量重命名。
+    - `StupidChessUEEditor` 在 UE 5.7 下编译通过。
+28. UnrealMCP fork 工作流落地：
+    - 新增 fork 仓库：`git@github.com:MotionlessPeri/unreal-mcp.git`（本地路径 `D:\git_projects\unreal-mcp`，配置 upstream）。
+    - 在 fork 中完成蓝图查找逻辑增强：支持完整路径（如 `/Game/WBP_LocalMatchDebug`）与名称自动搜索（不再限定 `/Game/Blueprints`、`/Game/Widgets`）。
+    - 在 fork 中合入 `Python/unreal_mcp_server.py` 的 `FastMCP` 0.x/2.x 初始化兼容补丁。
+    - 新增 `tools/sync_unreal_mcp.ps1`，用于将 fork 插件同步到 `clients/ue/StupidChessUE/Plugins/UnrealMCP`。
+29. UE MCP 操作文档切换完成：
+    - `clients/ue/McpBlueprintWorkflow.md` 明确旧 MCP 流程弃用，统一到 UnrealMCP/fork 方案。
+    - 补齐 Codex 日常操作闭环（连通性探测 -> 蓝图操作 -> Compile+Save -> 回读校验）。
+    - 补齐能力边界与排障口径（端口监听、依赖版本、DLL 占用）。
+30. UnrealMCP 事件绑定修复已入 fork 并同步：
+    - 修复 `bind_widget_event`：从 `CreateNewBoundEventForClass` 切换到 `CreateNewBoundEventForComponent`，按组件变量生成 `UK2Node_ComponentBoundEvent`。
+    - 增加参数兼容：支持 `blueprint_name + widget_name` 与 legacy `widget_name + widget_component_name` 两种调用形态。
+    - Python `umg_tools.bind_widget_event` 已改为优先发送新参数。
+    - 通过 `tools/sync_unreal_mcp.ps1` 同步到 `clients/ue/StupidChessUE/Plugins/UnrealMCP`。
+31. `WBP_LocalMatchDebug` 自动接线推进：
+    - 6 个按钮的 `OnClicked` 事件节点已通过 MCP 自动创建并绑定。
+    - 已自动接线并可编译通过的链路：`BtnJoin`、`BtnCommitReveal`、`BtnBlackResign`、`BtnPullRed`、`BtnPullBlack`。
+    - `BtnRedMove` 当前接为占位日志链路（`PrintString`），等待 `FStupidChessMoveCommand` 结构体入参自动化能力补齐后再切回真实 `SubmitMove`。
+32. UnrealMCP 蓝图命令增强（本地 fork + 项目插件同步）：
+    - 新增 `clear_blueprint_event_graph`，支持一键清理 EventGraph。
+    - 新增 `add_blueprint_dynamic_cast_node`，支持在自动接线中做类型转换。
+    - `connect_blueprint_nodes` 改为走 `Schema->TryCreateConnection`，拒绝非法连线，避免“连上但编译报错”。
+33. 蓝图自动化脚本落地：
+    - 新增 `tools/reset_local_match_widget_graph.py`（清图 + 仅重绑按钮事件）。
+    - 新增 `tools/wire_local_match_widget_graph.py`（清图 + 重绑 + 完整链路重建）。
+    - 脚本执行后 `WBP_LocalMatchDebug` 当前可完成无 `AssetLog` 编译错误的重建流程。
+34. 蓝图事件节点布局控制：
+    - `bind_widget_event` 新增 `node_position` 支持，可稳定控制红色 `OnClicked` 事件节点位置。
+    - `WBP_LocalMatchDebug` 自动重建脚本已接入该参数，避免事件入口堆叠在图右侧。
+35. 仓库 LFS 受限兜底完成：
+    - 由于 GitHub 仓库侧返回 `Git LFS is disabled for this repository`，UE 资产跟踪策略临时切换为普通 Git 二进制对象。
+    - `.gitattributes`、`docs/DependencyPolicy.md`、`clients/ue/README.md` 已同步更新为非 LFS 口径。
 
 ## In Progress
 
-1. 等待在 UE 编辑器内按 `BlueprintQuickStart` 落地第一个可交互调试 Widget。
+1. 补齐 `BtnRedMove` 的 `FStupidChessMoveCommand` 结构体输入自动化（当前为占位日志链路）。
+2. 在 UnrealMCP 增加“结构体字面量节点/结构体引脚设值”能力。
+3. 基于新能力恢复 `SubmitMove` 自动接线并做按钮端到端回归（Join -> CommitReveal -> Move -> Resign）。
 
 ## Next Steps
 
-1. 在 UE 工程内按模板创建 `WBP_LocalMatchDebug` 并完成按钮/事件接线。
-2. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
-3. 评估 JSON 与二进制协议切换策略（是否保留 JSON 调试通道）。
+1. 在 UnrealMCP 增加 `MakeStruct/SetStructPin` 能力，并同步到项目插件。
+2. 完成 `BtnRedMove -> SubmitMove` 真链路自动接线与编译校验。
+3. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
 
 ## Test Baseline
 

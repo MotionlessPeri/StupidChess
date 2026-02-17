@@ -9,6 +9,7 @@ out/
 *.userosscache
 *.sln.docstates
 prompt.md
+unreal_mcp.log
 
 # Unreal Engine generated files
 clients/ue/**/.vs/

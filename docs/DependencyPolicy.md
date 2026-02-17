@@ -30,7 +30,12 @@
 4. 构建参数统一通过 `CMakePresets.json` 管理，避免绕过 toolchain 约束。
 5. `vcpkg.json` 必须固定 `builtin-baseline`，避免不同 vcpkg 实例解析到不一致的 ports 版本。
 6. 测试依赖通过 manifest feature（`tests`）启用，避免无测试构建下载不必要依赖。
-7. UE 内容资产仍使用 Git 管理，但必须通过 Git LFS 跟踪二进制资产（如 `*.uasset`、`*.umap`）。
+7. UE 内容资产当前使用 Git 二进制跟踪（`*.uasset`、`*.umap` 等通过 `.gitattributes` 标记 `binary`），暂不启用 Git LFS（仓库侧 LFS 被禁用）。
+8. 若后续仓库侧恢复 Git LFS，可在一次独立提交中切回 LFS 跟踪策略并同步更新文档。
+9. UE 蓝图自动化可引入 `chongdashu/unreal-mcp`（实验性）作为开发工具链：
+   - UE 侧以 `Plugins/UnrealMCP` 源码插件形式接入。
+   - Python 侧仅用于本地 MCP server，不进入运行时发布产物。
+   - 固定兼容依赖为 `fastmcp==0.4.1` 与 `mcp[cli]==1.5.0`，避免 2.x API 破坏。
 
 ## 记录要求
 
