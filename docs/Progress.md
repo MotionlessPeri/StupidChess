@@ -153,6 +153,14 @@
     - `UnrealMCP` 相关改动已迁移并提交到 fork：`MotionlessPeri/unreal-mcp@4c60eac`。
     - 本仓通过 `tools/sync_unreal_mcp.ps1 -ForkRepoRoot D:\git_projects\unreal-mcp` 同步插件副本，不再以本仓插件副本作为真源。
     - `AGENTS.md` 与 `clients/ue/McpBlueprintWorkflow.md` 已补充“先改 fork、后同步本仓”的强约束说明。
+48. UE 编译故障修复（去重命令排序比较器签名）：
+    - `dedupe_blueprint_component_bound_events` 的 `TArray<UK2Node_ComponentBoundEvent*>.Sort` 比较器参数由指针签名修正为引用签名。
+    - 修复已先提交到 fork：`MotionlessPeri/unreal-mcp@4a5abea`，再通过 `tools/sync_unreal_mcp.ps1` 同步回本仓插件副本。
+    - 命令行编译验证通过：`Build.bat StupidChessUEEditor Win64 Development ...`（Result: Succeeded）。
+49. `WBP_LocalMatchDebug` 重叠节点清理与全量重建：
+    - 使用 `python tools/wire_local_match_widget_graph.py --clear --wire-construct` 执行 destructive 清图重建，移除历史重复/孤立节点（本次清理 `removed_count=125`）。
+    - 按钮事件入口与主链路已重建为单份可读图，不再依赖 Preserve 模式下残留节点。
+    - 重建后蓝图编译通过并落盘：`compiled=true`，`/Game/WBP_LocalMatchDebug` 已保存。
 
 ## In Progress
 
