@@ -17,7 +17,7 @@ from typing import Any, Dict
 
 UE_HOST = "127.0.0.1"
 UE_PORT = 55557
-BLUEPRINT_NAME = "WBP_LocalMatchDebug"
+BLUEPRINT_NAME = "/Game/WBP_LocalMatchDebug"
 
 BUTTONS = {
     "BtnJoin": (-2800, -900),

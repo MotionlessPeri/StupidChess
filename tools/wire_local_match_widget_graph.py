@@ -4,14 +4,16 @@ Rebuild WBP_LocalMatchDebug with a clean, readable event graph wiring.
 
 Notes:
 - Uses UnrealMCP TCP command endpoint (127.0.0.1:55557).
-- Clears the current EventGraph first.
+- Preserves existing graph by default (including Construct/custom callback chains).
+- Use --clear for deterministic rebuild from scratch.
 - Rebinds 6 button OnClicked events and wires functional chains.
-- BtnRedMove is temporarily wired to a log message because SubmitMove needs
-  a by-ref struct input that current MCP commands cannot auto-build.
+- BtnRedMove is wired to a real SubmitMove test command using struct default text.
+- Default behavior does NOT touch existing Construct chain unless --wire-construct is specified.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import socket
 import sys
@@ -21,7 +23,8 @@ from typing import Any, Dict
 
 UE_HOST = "127.0.0.1"
 UE_PORT = 55557
-BLUEPRINT_NAME = "WBP_LocalMatchDebug"
+BLUEPRINT_NAME = "/Game/WBP_LocalMatchDebug"
+SUBSYSTEM_CLASS = "/Script/StupidChessCoreBridge.StupidChessLocalMatchSubsystem"
 
 MATCH_ID = "900"
 RED_PLAYER_ID = "10001"
@@ -87,6 +90,22 @@ def add_call(target: str, function_name: str, node_x: int, node_y: int, params: 
     return result["result"]["node_id"]
 
 
+def add_make_struct(struct_type: str, node_x: int, node_y: int, values: Dict[str, Any]) -> tuple[str, str]:
+    result = require_success(
+        send_command(
+            "add_blueprint_make_struct_node",
+            {
+                "blueprint_name": BLUEPRINT_NAME,
+                "struct_type": struct_type,
+                "node_position": [node_x, node_y],
+                "values": values,
+            },
+        ),
+        f"add_blueprint_make_struct_node({struct_type})",
+    )
+    return result["result"]["node_id"], result["result"]["output_pin"]
+
+
 def connect_exec(source_node_id: str, target_node_id: str) -> None:
     require_success(
         send_command(
@@ -120,27 +139,31 @@ def connect_data(source_node_id: str, source_pin: str, target_node_id: str, targ
 
 
 def add_get_subsystem(node_x: int, node_y: int) -> str:
-    get_subsystem = add_call(
-        target="USubsystemBlueprintLibrary",
-        function_name="GetGameInstanceSubsystem",
-        node_x=node_x,
-        node_y=node_y,
-        params={"Class": "/Script/StupidChessCoreBridge.StupidChessLocalMatchSubsystem"},
-    )
-    cast_result = require_success(
+    result = require_success(
         send_command(
-            "add_blueprint_dynamic_cast_node",
+            "add_blueprint_subsystem_getter_node",
             {
                 "blueprint_name": BLUEPRINT_NAME,
-                "target_class": "/Script/StupidChessCoreBridge.StupidChessLocalMatchSubsystem",
-                "node_position": [node_x + 280, node_y],
+                "subsystem_class": SUBSYSTEM_CLASS,
+                "node_position": [node_x, node_y],
             },
         ),
-        "add_blueprint_dynamic_cast_node",
+        "add_blueprint_subsystem_getter_node",
     )
-    cast_node = cast_result["result"]["node_id"]
-    connect_data(get_subsystem, "ReturnValue", cast_node, "Object")
-    return cast_node
+    return result["result"]["node_id"]
+
+
+def add_button_click_log(button_name: str, node_x: int, node_y: int) -> str:
+    return add_call(
+        target="UKismetSystemLibrary",
+        function_name="PrintString",
+        node_x=node_x,
+        node_y=node_y,
+        params={
+            "InString": f"[Click][{button_name}]",
+            "Duration": 2.0,
+        },
+    )
 
 
 def bind_buttons() -> EventIds:
@@ -167,13 +190,147 @@ def bind_buttons() -> EventIds:
             ),
             f"bind_widget_event({button_name})",
         )
-        ids[button_name] = result["result"]["node_id"]
-        print(f"[OK] Bound {button_name}: {ids[button_name]}")
+        bound_node_id = result["result"]["node_id"]
+        dedupe_result = require_success(
+            send_command(
+                "dedupe_blueprint_component_bound_events",
+                {
+                    "blueprint_name": BLUEPRINT_NAME,
+                    "widget_name": button_name,
+                    "event_name": "OnClicked",
+                    "event_output_pin": "Then",
+                    "keep_node_id": bound_node_id,
+                },
+            ),
+            f"dedupe_blueprint_component_bound_events({button_name})",
+        )
+        ids[button_name] = dedupe_result["result"].get("kept_node_id", bound_node_id)
+        print(
+            "[OK] Bound+deduped "
+            f"{button_name}: kept={ids[button_name]} "
+            f"removed_event_nodes={dedupe_result['result'].get('removed_event_nodes', 0)} "
+            f"removed_chain_nodes={dedupe_result['result'].get('removed_chain_nodes', 0)}"
+        )
     return EventIds(**ids)  # type: ignore[arg-type]
 
 
+def clear_event_exec_chain(event_node_id: str) -> None:
+    require_success(
+        send_command(
+            "clear_blueprint_event_exec_chain",
+            {
+                "blueprint_name": BLUEPRINT_NAME,
+                "event_node_id": event_node_id,
+                "event_output_pin": "Then",
+            },
+        ),
+        f"clear_blueprint_event_exec_chain({event_node_id}.Then)",
+    )
+
+
+def save_blueprint_asset() -> None:
+    # Re-bind one existing button event to trigger plugin-side SaveAsset().
+    require_success(
+        send_command(
+            "bind_widget_event",
+            {
+                "blueprint_name": BLUEPRINT_NAME,
+                "widget_name": "BtnJoin",
+                "event_name": "OnClicked",
+                "function_name": "OnBtnJoinClicked",
+                "node_position": [-2800, -900],
+            },
+        ),
+        "save_blueprint_asset(bind_widget_event)",
+    )
+
+
+def add_event(event_name: str, node_x: int, node_y: int) -> str:
+    result = require_success(
+        send_command(
+            "add_blueprint_event_node",
+            {
+                "blueprint_name": BLUEPRINT_NAME,
+                "event_name": event_name,
+                "node_position": [node_x, node_y],
+            },
+        ),
+        f"add_blueprint_event_node({event_name})",
+    )
+    return result["result"]["node_id"]
+
+
+def bind_multicast_delegate(
+    delegate_name: str,
+    target_node_id: str,
+    exec_source_node_id: str,
+    node_x: int,
+    node_y: int,
+) -> tuple[str, str]:
+    result = require_success(
+        send_command(
+            "bind_blueprint_multicast_delegate",
+            {
+                "blueprint_name": BLUEPRINT_NAME,
+                "target_class": SUBSYSTEM_CLASS,
+                "delegate_name": delegate_name,
+                "target_node_id": target_node_id,
+                "target_output_pin": "ReturnValue",
+                "assign_target_pin": "self",
+                "exec_source_node_id": exec_source_node_id,
+                "exec_source_pin": "Then",
+                "assign_exec_pin": "Execute",
+                "node_position": [node_x, node_y],
+                "custom_event_position": [node_x + 300, node_y + 120],
+            },
+        ),
+        f"bind_blueprint_multicast_delegate({delegate_name})",
+    )
+    assign_node_id = result["result"]["assign_node_id"]
+    custom_event_node_id = result["result"]["custom_event_node_id"]
+    return assign_node_id, custom_event_node_id
+
+
+def wire_construct_delegate_bindings() -> None:
+    construct_event = add_event("Construct", -3600, -2200)
+    getter_subsystem = add_get_subsystem(-3200, -2200)
+
+    delegate_logs = [
+        ("OnJoinAckParsed", "[Callback][JoinAck]"),
+        ("OnCommandAckParsed", "[Callback][CommandAck]"),
+        ("OnErrorParsed", "[Callback][Error]"),
+        ("OnSnapshotParsed", "[Callback][Snapshot]"),
+        ("OnEventDeltaParsed", "[Callback][EventDelta]"),
+        ("OnGameOverParsed", "[Callback][GameOver]"),
+    ]
+
+    previous_exec_node = construct_event
+    for index, (delegate_name, log_text) in enumerate(delegate_logs):
+        base_y = -2200 + index * 280
+        assign_node, custom_event_node = bind_multicast_delegate(
+            delegate_name=delegate_name,
+            target_node_id=getter_subsystem,
+            exec_source_node_id=previous_exec_node,
+            node_x=-2700,
+            node_y=base_y,
+        )
+        print_node = add_call(
+            target="UKismetSystemLibrary",
+            function_name="PrintString",
+            node_x=-1800,
+            node_y=base_y + 120,
+            params={
+                "InString": log_text,
+                "Duration": 2.0,
+            },
+        )
+        connect_exec(custom_event_node, print_node)
+        previous_exec_node = assign_node
+
+
 def wire_join_chain(events: EventIds) -> None:
-    cast_subsystem = add_get_subsystem(-2300, -900)
+    click_log = add_button_click_log("BtnJoin", -2550, -900)
+    getter_subsystem = add_get_subsystem(-2300, -900)
     reset_local_server = add_call("UStupidChessLocalMatchSubsystem", "ResetLocalServer", -1850, -900)
     join_red = add_call(
         "UStupidChessLocalMatchSubsystem",
@@ -205,10 +362,10 @@ def wire_join_chain(events: EventIds) -> None:
     )
 
     for node_id in [reset_local_server, join_red, join_black, pull_red, pull_black]:
-        connect_data(cast_subsystem, "ReturnValue", node_id, "self")
+        connect_data(getter_subsystem, "ReturnValue", node_id, "self")
 
-    connect_exec(events.BtnJoin, cast_subsystem)
-    connect_exec(cast_subsystem, reset_local_server)
+    connect_exec(events.BtnJoin, click_log)
+    connect_exec(click_log, reset_local_server)
     connect_exec(reset_local_server, join_red)
     connect_exec(join_red, join_black)
     connect_exec(join_black, pull_red)
@@ -216,7 +373,8 @@ def wire_join_chain(events: EventIds) -> None:
 
 
 def wire_commit_reveal_chain(events: EventIds) -> None:
-    cast_subsystem = add_get_subsystem(-2300, -300)
+    click_log = add_button_click_log("BtnCommitReveal", -2550, -300)
+    getter_subsystem = add_get_subsystem(-2300, -300)
     commit_red = add_call(
         "UStupidChessLocalMatchSubsystem",
         "SubmitCommitSetup",
@@ -275,13 +433,13 @@ def wire_commit_reveal_chain(events: EventIds) -> None:
     )
 
     for node_id in [commit_red, commit_black, placements_red, reveal_red, placements_black, reveal_black, pull_red, pull_black]:
-        connect_data(cast_subsystem, "ReturnValue", node_id, "self")
+        connect_data(getter_subsystem, "ReturnValue", node_id, "self")
 
     connect_data(placements_red, "ReturnValue", reveal_red, "Placements")
     connect_data(placements_black, "ReturnValue", reveal_black, "Placements")
 
-    connect_exec(events.BtnCommitReveal, cast_subsystem)
-    connect_exec(cast_subsystem, commit_red)
+    connect_exec(events.BtnCommitReveal, click_log)
+    connect_exec(click_log, commit_red)
     connect_exec(commit_red, commit_black)
     connect_exec(commit_black, reveal_red)
     connect_exec(reveal_red, reveal_black)
@@ -289,22 +447,62 @@ def wire_commit_reveal_chain(events: EventIds) -> None:
     connect_exec(pull_red, pull_black)
 
 
-def wire_red_move_placeholder(events: EventIds) -> None:
-    print_node = add_call(
-        "UKismetSystemLibrary",
-        "PrintString",
-        -1200,
-        300,
+def wire_red_move_chain(events: EventIds) -> None:
+    click_log = add_button_click_log("BtnRedMove", -1450, 300)
+    getter_subsystem = add_get_subsystem(-1200, 300)
+    move_struct_node, move_struct_output_pin = add_make_struct(
+        "/Script/StupidChessCoreBridge.StupidChessMoveCommand",
+        -980,
+        80,
         {
-            "InString": "TODO: SubmitMove needs MCP struct-pin support for FStupidChessMoveCommand.",
-            "Duration": 2.0,
+            "PieceId": 11,
+            "FromX": 0,
+            "FromY": 3,
+            "ToX": 0,
+            "ToY": 4,
+            "bHasCapturedPieceId": False,
+            "CapturedPieceId": 0,
         },
     )
-    connect_exec(events.BtnRedMove, print_node)
+    submit_move = add_call(
+        "UStupidChessLocalMatchSubsystem",
+        "SubmitMove",
+        -900,
+        300,
+        {
+            "MatchId": MATCH_ID,
+            "PlayerId": RED_PLAYER_ID,
+            "Side": "Red",
+        },
+    )
+    pull_red = add_call(
+        "UStupidChessLocalMatchSubsystem",
+        "PullParseAndDispatchOutboundMessages",
+        -500,
+        300,
+        {"PlayerId": RED_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
+    )
+    pull_black = add_call(
+        "UStupidChessLocalMatchSubsystem",
+        "PullParseAndDispatchOutboundMessages",
+        -100,
+        300,
+        {"PlayerId": BLACK_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
+    )
+
+    for node_id in [submit_move, pull_red, pull_black]:
+        connect_data(getter_subsystem, "ReturnValue", node_id, "self")
+    connect_data(move_struct_node, move_struct_output_pin, submit_move, "Move")
+
+    connect_exec(events.BtnRedMove, click_log)
+    connect_exec(click_log, submit_move)
+    connect_exec(submit_move, pull_red)
+    connect_exec(pull_red, pull_black)
 
 
 def wire_black_resign_chain(events: EventIds) -> None:
-    cast_subsystem = add_get_subsystem(-2300, 900)
+    click_log = add_button_click_log("BtnBlackResign", -2550, 900)
+    getter_subsystem = add_get_subsystem(-2300, 900)
     resign_black = add_call(
         "UStupidChessLocalMatchSubsystem",
         "SubmitResign",
@@ -328,16 +526,17 @@ def wire_black_resign_chain(events: EventIds) -> None:
     )
 
     for node_id in [resign_black, pull_red, pull_black]:
-        connect_data(cast_subsystem, "ReturnValue", node_id, "self")
+        connect_data(getter_subsystem, "ReturnValue", node_id, "self")
 
-    connect_exec(events.BtnBlackResign, cast_subsystem)
-    connect_exec(cast_subsystem, resign_black)
+    connect_exec(events.BtnBlackResign, click_log)
+    connect_exec(click_log, resign_black)
     connect_exec(resign_black, pull_red)
     connect_exec(pull_red, pull_black)
 
 
 def wire_pull_buttons(events: EventIds) -> None:
-    cast_subsystem_red = add_get_subsystem(-2300, 1500)
+    click_log_red = add_button_click_log("BtnPullRed", -2550, 1500)
+    getter_subsystem_red = add_get_subsystem(-2300, 1500)
     pull_red = add_call(
         "UStupidChessLocalMatchSubsystem",
         "PullParseAndDispatchOutboundMessages",
@@ -345,11 +544,12 @@ def wire_pull_buttons(events: EventIds) -> None:
         1500,
         {"PlayerId": RED_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
     )
-    connect_data(cast_subsystem_red, "ReturnValue", pull_red, "self")
-    connect_exec(events.BtnPullRed, cast_subsystem_red)
-    connect_exec(cast_subsystem_red, pull_red)
+    connect_data(getter_subsystem_red, "ReturnValue", pull_red, "self")
+    connect_exec(events.BtnPullRed, click_log_red)
+    connect_exec(click_log_red, pull_red)
 
-    cast_subsystem_black = add_get_subsystem(-2300, 1900)
+    click_log_black = add_button_click_log("BtnPullBlack", -2550, 1900)
+    getter_subsystem_black = add_get_subsystem(-2300, 1900)
     pull_black = add_call(
         "UStupidChessLocalMatchSubsystem",
         "PullParseAndDispatchOutboundMessages",
@@ -357,26 +557,52 @@ def wire_pull_buttons(events: EventIds) -> None:
         1900,
         {"PlayerId": BLACK_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
     )
-    connect_data(cast_subsystem_black, "ReturnValue", pull_black, "self")
-    connect_exec(events.BtnPullBlack, cast_subsystem_black)
-    connect_exec(cast_subsystem_black, pull_black)
+    connect_data(getter_subsystem_black, "ReturnValue", pull_black, "self")
+    connect_exec(events.BtnPullBlack, click_log_black)
+    connect_exec(click_log_black, pull_black)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Wire WBP_LocalMatchDebug event graph.")
+    parser.add_argument(
+        "--clear",
+        action="store_true",
+        help="Clear EventGraph before wiring. This is destructive and removes custom Construct/callback chains.",
+    )
+    parser.add_argument(
+        "--wire-construct",
+        action="store_true",
+        help="Also (re)build Construct->delegate bindings. Disabled by default to preserve manual Construct chains.",
+    )
+    return parser.parse_args()
 
 
 def main() -> int:
     try:
-        clear_result = require_success(
-            send_command(
+        args = parse_args()
+        if args.clear:
+            clear_result = require_success(
+                send_command(
+                    "clear_blueprint_event_graph",
+                    {"blueprint_name": BLUEPRINT_NAME, "keep_bound_events": False},
+                ),
                 "clear_blueprint_event_graph",
-                {"blueprint_name": BLUEPRINT_NAME, "keep_bound_events": False},
-            ),
-            "clear_blueprint_event_graph",
-        )
-        print(f"[OK] Cleared graph: {json.dumps(clear_result.get('result', {}), ensure_ascii=False)}")
+            )
+            print(f"[OK] Cleared graph: {json.dumps(clear_result.get('result', {}), ensure_ascii=False)}")
+        else:
+            print("[INFO] Preserve mode enabled: skip clear step and keep existing custom nodes/chains.")
+            print("[INFO] Preserve mode still performs event-chain cleanup + bound-event dedupe for button paths.")
 
         events = bind_buttons()
+        for event_node_id in [events.BtnJoin, events.BtnCommitReveal, events.BtnRedMove, events.BtnBlackResign, events.BtnPullRed, events.BtnPullBlack]:
+            clear_event_exec_chain(event_node_id)
+        if args.wire_construct:
+            wire_construct_delegate_bindings()
+        else:
+            print("[INFO] Skip Construct wiring (--wire-construct not set).")
         wire_join_chain(events)
         wire_commit_reveal_chain(events)
-        wire_red_move_placeholder(events)
+        wire_red_move_chain(events)
         wire_black_resign_chain(events)
         wire_pull_buttons(events)
 
@@ -385,6 +611,8 @@ def main() -> int:
             "compile_blueprint",
         )
         print(f"[OK] Compiled: {json.dumps(compile_result.get('result', {}), ensure_ascii=False)}")
+        save_blueprint_asset()
+        print("[OK] Saved: /Game/WBP_LocalMatchDebug")
         print("[DONE] WBP_LocalMatchDebug graph rebuilt.")
         return 0
     except Exception as exc:

@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-1. 2026-02-17
+1. 2026-02-19
 
 ## Current Milestone
 
@@ -109,18 +109,62 @@
 35. 仓库 LFS 受限兜底完成：
     - 由于 GitHub 仓库侧返回 `Git LFS is disabled for this repository`，UE 资产跟踪策略临时切换为普通 Git 二进制对象。
     - `.gitattributes`、`docs/DependencyPolicy.md`、`clients/ue/README.md` 已同步更新为非 LFS 口径。
+36. 蓝图接线脚本防误清图改造：
+    - `tools/wire_local_match_widget_graph.py` 默认切换为 Preserve 模式（不执行清图），避免误删 `Construct` 与自定义回调链路。
+    - 增加 `--clear` 显式开关用于全量重建，并在脚本与文档中标注该模式是 destructive。
+    - `tools/README.md` 与 `clients/ue/McpBlueprintWorkflow.md` 已同步更新使用说明。
+37. 委托绑定自动化已接入：
+    - UnrealMCP 新增 `bind_blueprint_multicast_delegate` 命令，可自动创建 `Assign Delegate` 与匹配 `CustomEvent`。
+    - `tools/wire_local_match_widget_graph.py` 已接入该命令，自动重建 `Construct -> Subsystem -> On*Parsed` 绑定链路并附带回调日志节点。
+    - `Btn*` 按钮链路与 `Construct` 委托链路现在可由同一脚本统一重建。
+    - 自动化脚本默认改用蓝图全路径 `/Game/WBP_LocalMatchDebug`，避免短名在 AssetRegistry 未命中时偶发 `Blueprint not found`。
+38. 回调日志可读性增强：
+    - `tools/wire_local_match_widget_graph.py` 将 6 个 `On*Parsed` 回调的 `PrintString` 文案改为可区分前缀（`[Callback][JoinAck]` 等），便于运行时快速定位事件来源。
+39. 蓝图自动接线落盘保障：
+    - `tools/wire_local_match_widget_graph.py` 在编译后补一次 `bind_widget_event` 触发插件侧 `SaveAsset`，避免“脚本执行成功但编辑器显示/磁盘落盘不同步”。
+40. 按钮点击日志自动化补齐：
+    - `tools/wire_local_match_widget_graph.py` 为 6 个 `OnClicked` 入口统一插入 `PrintString`（`[Click][Btn...]`）再进入原业务链路。
+    - 便于在 PIE 中快速确认“点击事件是否触发”与“触发的是哪个按钮”。
+41. UnrealMCP 蓝图查找扩展到 Level Blueprint：
+    - `FUnrealMCPCommonUtils::FindBlueprintByName` 现支持将 `UWorld/ULevel/ALevelScriptActor` 解析为 `ULevelScriptBlueprint`。
+    - 非路径名查找新增 `/Game/Maps/<Name>` 候选路径，并补充 AssetRegistry 的 `UWorld` 回退检索。
+    - 支持使用 `DebugLevel` 或 `/Game/DebugLevel` 作为 `find_blueprint_nodes` 的 `blueprint_name` 来读取 Level BP 事件节点。
+42. UnrealMCP 新增 Subsystem Getter 节点创建能力：
+    - `FUnrealMCPBlueprintNodeCommands` 新增 `add_blueprint_subsystem_getter_node` 命令。
+    - 命令通过 `UK2Node_GetSubsystem` 直接创建 `Get <Subsystem>` 节点，可指定 `subsystem_class` 与 `node_position`。
+    - `UnrealMCPBridge` 已注册该命令路由；当前待 UE 重编译加载新插件二进制后生效。
+43. 蓝图自动接线脚本切换到专用 Subsystem Getter：
+    - `tools/wire_local_match_widget_graph.py` 改为使用 `add_blueprint_subsystem_getter_node`，不再拼接 `GetGameInstanceSubsystem + DynamicCast`。
+    - 脚本新增 `--wire-construct` 开关；默认跳过 `Construct` 重建，避免覆盖手工维护的 `Construct` 链。
+    - `tools/README.md` 已同步新参数与行为说明。
+44. `BtnRedMove` 自动接线恢复为真实命令链：
+    - `tools/wire_local_match_widget_graph.py` 改为 `SubmitMove(Move)` + 红黑双侧 `PullParseAndDispatchOutboundMessages`。
+    - `Move` 参数以结构体默认值文本写入：`PieceId=11, From(0,3)->To(0,4)`。
+    - 可用于验证“红先走一步后，黑认输触发 `GameOver`”的端到端流程。
+45. UnrealMCP 新增结构体与清旧链路命令：
+    - 新增 `add_blueprint_make_struct_node`，用于创建 `MakeStruct` 节点并写入字段默认值（支持 `StupidChessMoveCommand`）。
+    - 新增 `break_blueprint_node_pin_links`，用于断开按钮事件 `Then` 旧连线，避免 Preserve 模式下历史 TODO/旧链路继续触发。
+    - `tools/wire_local_match_widget_graph.py` 已接入以上命令：`BtnRedMove` 走 `MakeStruct -> SubmitMove`，并在重接前清理 6 个按钮入口旧连线。
+46. UnrealMCP 新增按钮事件去重清理能力：
+    - 新增 `dedupe_blueprint_component_bound_events`，按 `widget_name + event_name` 去重 `UK2Node_ComponentBoundEvent`。
+    - 去重时会连同重复事件节点下游执行链一并清理，减少 `WBP_LocalMatchDebug` 的历史残留节点。
+    - `tools/wire_local_match_widget_graph.py` 绑定按钮后会自动调用去重命令，默认 Preserve 模式下也能保持按钮入口可重复执行且不堆积脏节点。
+47. MCP 源码真源流程已纠偏并固化：
+    - `UnrealMCP` 相关改动已迁移并提交到 fork：`MotionlessPeri/unreal-mcp@4c60eac`。
+    - 本仓通过 `tools/sync_unreal_mcp.ps1 -ForkRepoRoot D:\git_projects\unreal-mcp` 同步插件副本，不再以本仓插件副本作为真源。
+    - `AGENTS.md` 与 `clients/ue/McpBlueprintWorkflow.md` 已补充“先改 fork、后同步本仓”的强约束说明。
 
 ## In Progress
 
-1. 补齐 `BtnRedMove` 的 `FStupidChessMoveCommand` 结构体输入自动化（当前为占位日志链路）。
-2. 在 UnrealMCP 增加“结构体字面量节点/结构体引脚设值”能力。
-3. 基于新能力恢复 `SubmitMove` 自动接线并做按钮端到端回归（Join -> CommitReveal -> Move -> Resign）。
+1. 在新脚本链路上做一次稳定回归（Join -> CommitReveal -> Move -> Resign）并记录期望日志断言。
+2. 评估是否将 `AfterServerSequence` 从固定 `0` 升级为增量游标拉取，减少重复回调噪声。
+3. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
 
 ## Next Steps
 
-1. 在 UnrealMCP 增加 `MakeStruct/SetStructPin` 能力，并同步到项目插件。
-2. 完成 `BtnRedMove -> SubmitMove` 真链路自动接线与编译校验。
-3. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
+1. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
+2. 为 `Pull` 增加增量游标模式，降低重复回调噪声。
+3. 增加一键“仅重接按钮链路”的自动化回归脚本（不触碰 Construct）。
 
 ## Test Baseline
 

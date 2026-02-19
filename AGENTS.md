@@ -32,6 +32,7 @@
 3. 服务端是权威判定源，客户端不做最终规则裁决。
 4. 未经确认不得修改 `RuleSpec` 既定规则口径。
 5. 第三方依赖引入必须遵循 `docs/DependencyPolicy.md`。
+6. `UnrealMCP` 变更必须先在 fork 仓库 `D:\git_projects\unreal-mcp` 实现并提交，再通过 `tools/sync_unreal_mcp.ps1` 同步到本仓；禁止直接把本仓插件副本作为源码真源修改。
 
 ## 实现协作约定
 

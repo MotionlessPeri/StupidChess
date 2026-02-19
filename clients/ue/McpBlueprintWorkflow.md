@@ -5,6 +5,7 @@
 1. 当前唯一推荐方案是 `UnrealMCP`（`chongdashu/unreal-mcp` 的 fork）。
 2. 旧的 MCP/RemoteExecution 探测流程不再作为主流程使用。
 3. 本文档是 UE 蓝图 MCP 操作的唯一权威入口。
+4. 源码真源规则：`UnrealMCP` 功能修改必须先在 fork 仓库实现，再同步到本项目插件副本。
 
 ## 当前基线
 
@@ -25,6 +26,10 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 2. 在 `StupidChessUE.uproject` 中启用 `UnrealMCP` 插件。
 3. 打开 UE Editor 并加载目标工程（不要只打开空编辑器）。
 4. 确认 `127.0.0.1:55557` 正在监听（UnrealMCP 默认端口）。
+5. 若要改 MCP 功能，先在 fork 仓库改动并提交，再执行：
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot D:\git_projects\unreal-mcp
+```
 
 ## 日常使用流程（Codex）
 
@@ -43,6 +48,14 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 4. 已支持 `clear_blueprint_event_graph`（清空 EventGraph）与 `add_blueprint_dynamic_cast_node`（自动插入类型转换）。
 5. `connect_blueprint_nodes` 已改为 schema 校验连线，不再静默写入非法连接。
 6. `bind_widget_event` 支持可选 `node_position`，可将红色事件入口节点按预期布局到链路左侧。
+7. `tools/wire_local_match_widget_graph.py` 默认进入 Preserve 模式（不清空 EventGraph），避免误删 `Construct`/自定义回调链路；需要全量重建时显式传 `--clear`。
+8. 已接入 `bind_blueprint_multicast_delegate`，可在自动化脚本中直接生成 `Assign Delegate + CustomEvent` 委托绑定链路。
+9. `find_blueprint_nodes` 现支持通过地图资产名/路径解析 Level Blueprint（`ULevelScriptBlueprint`），例如 `DebugLevel` 或 `/Game/DebugLevel`。
+10. 新增 `add_blueprint_subsystem_getter_node`：可直接创建 `Get <YourSubsystem>` 节点（基于 `UK2Node_GetSubsystem`），避免“通用 `Get Game Instance Subsystem + Cast`”手工拼接。
+11. `tools/wire_local_match_widget_graph.py` 默认不重建 `Construct`，避免覆盖手工链路；需要自动重建委托绑定时显式使用 `--wire-construct`。
+12. 新增 `add_blueprint_make_struct_node`：可创建 `UK2Node_MakeStruct` 并设置字段默认值，适配 `SubmitMove` 这类 by-ref 结构体入参。
+13. 新增 `break_blueprint_node_pin_links`：可按节点+引脚断开旧连线，用于 Preserve 模式下重接按钮链路时清理历史分支。
+14. 新增 `dedupe_blueprint_component_bound_events`：可按 `widget_name + event_name` 清理重复 `ComponentBoundEvent` 及其旧执行链，防止按钮入口重复残留。
 
 ## 能力边界（当前）
 
@@ -50,6 +63,7 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 2. 即使支持编辑命令，也建议按“改动后立即读取校验”的闭环执行，避免静默失败。
 3. `WidgetBlueprint` 不提供稳定文本导出，不建议走文本 diff 作为主验证手段。
 4. `compile_blueprint` 返回 `compiled=true` 不等价于“绝对无编译告警/错误”，仍需回读 UE 日志中的 `LogBlueprint: Error: [AssetLog]`。
+5. `find_blueprint_nodes` 当前只支持 `node_type=Event`（返回 `node_guids`），不支持直接按 `K2Node_CallFunction` 枚举详细节点信息。
 
 ## 常见问题排查
 
@@ -71,6 +85,12 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 7. 日志出现 `LoadAsset failed: /Game/Blueprints/...` 与 `/Game/Widgets/...`:
    - 当前插件会先探测这些默认路径，再回退到 `/Game/<AssetName>` 或 AssetRegistry 搜索。
    - 若最终能加载并执行命令，这类日志可视为探测噪声，不是致命错误。
+8. 新增命令报 `Unknown command: add_blueprint_subsystem_getter_node`:
+   - 说明 UE 正在运行旧版插件二进制。
+   - 关闭 UE 或停止 Live Coding（`Ctrl+Alt+F11`）后重编译 `StupidChessUEEditor`，再重启编辑器。
+9. 运行 `wire_local_match_widget_graph.py` 后按钮仍出现多条重复分支:
+   - 先确认插件二进制已包含 `dedupe_blueprint_component_bound_events`。
+   - 若命令未知，按上一条流程重启 UE 并重编译插件。
 
 ## 本地直连自检（可选）
 
