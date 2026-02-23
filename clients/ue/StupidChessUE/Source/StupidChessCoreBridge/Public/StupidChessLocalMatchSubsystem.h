@@ -349,6 +349,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
     int32 PullParseAndDispatchOutboundMessages(int64 PlayerId, int64 AfterServerSequence = 0);
 
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
+    int32 PullParseAndDispatchOutboundMessagesIncremental(int64 PlayerId, bool bResetCursorBeforePull = false);
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Server")
+    void ResetPullCursor(int64 PlayerId = 0);
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
+    int64 GetPullCursor(int64 PlayerId) const;
+
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     TArray<FStupidChessOutboundMessage> GetLastPulledMessages() const;
 
@@ -397,6 +406,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     bool GetCachedCommandAck(FStupidChessCommandAckView& OutCommandAck) const;
 
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server|Debug")
+    FString GetCachedCommandAckDebugString() const;
+
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     bool GetCachedError(FStupidChessErrorView& OutError) const;
 
@@ -408,6 +420,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     bool GetCachedGameOver(FStupidChessGameOverView& OutGameOver) const;
+
+    UFUNCTION(BlueprintPure, Category = "StupidChess|Server|Debug")
+    FString GetCachedGameOverDebugString() const;
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Server")
     int64 GetNextClientSequence() const;
@@ -425,6 +440,7 @@ private:
     uint64 NextClientSequence = 1;
     FStupidChessServerRuntime* ServerRuntime = nullptr;
     TArray<FStupidChessOutboundMessage> LastPulledMessages;
+    TMap<int64, int64> PullCursorByPlayer;
     bool bHasCachedJoinAck = false;
     bool bHasCachedCommandAck = false;
     bool bHasCachedError = false;

@@ -37,8 +37,8 @@
    - `ResetLocalServer`
    - `JoinLocalMatch(MatchId, RedPlayerId)`
    - `JoinLocalMatch(MatchId, BlackPlayerId)`
-   - `PullParseAndDispatchOutboundMessages(RedPlayerId)`
-   - `PullParseAndDispatchOutboundMessages(BlackPlayerId)`
+   - `PullParseAndDispatchOutboundMessagesIncremental(RedPlayerId)`
+   - `PullParseAndDispatchOutboundMessagesIncremental(BlackPlayerId)`
 
 2. `BtnCommitReveal`：
    - 红方：
@@ -49,17 +49,17 @@
      - `SubmitCommitSetup(MatchId, BlackPlayerId, Black, "")`
      - `BuildStandardSetupPlacements(Black)`
      - `SubmitRevealSetup(MatchId, BlackPlayerId, Black, "B", BlackPlacements)`
-   - 之后分别 `PullParseAndDispatchOutboundMessages(RedPlayerId/BlackPlayerId)`
+   - 之后分别 `PullParseAndDispatchOutboundMessagesIncremental(RedPlayerId/BlackPlayerId)`
 
 3. `BtnRedMove`（测试用）：
    - 组一个 `FStupidChessMoveCommand`：
      - `PieceId=11, From(0,3), To(0,4), bHasCapturedPieceId=false`
    - 调用 `SubmitMove(MatchId, RedPlayerId, Red, Move)`
-   - 再分别 `PullParseAndDispatchOutboundMessages(RedPlayerId/BlackPlayerId)`
+   - 再分别 `PullParseAndDispatchOutboundMessagesIncremental(RedPlayerId/BlackPlayerId)`
 
 4. `BtnBlackResign`：
    - `SubmitResign(MatchId, BlackPlayerId, Black)`
-   - 再分别 `PullParseAndDispatchOutboundMessages(RedPlayerId/BlackPlayerId)`
+   - 再分别 `PullParseAndDispatchOutboundMessagesIncremental(RedPlayerId/BlackPlayerId)`
    - 在 `OnGameOverParsed` 里读：
      - `Result`
      - `EndReason`
@@ -67,7 +67,8 @@
      - `WinnerSide`
 
 5. `BtnPullRed` / `BtnPullBlack`：
-   - 分别调用一次 `PullParseAndDispatchOutboundMessages(PlayerId)`，用于手动补拉。
+   - 分别调用一次 `PullParseAndDispatchOutboundMessagesIncremental(PlayerId)`，用于手动补拉。
+   - 如需强制从头重拉，先调用 `ResetPullCursor(PlayerId)` 再补拉。
 
 ## 4. 调试建议
 

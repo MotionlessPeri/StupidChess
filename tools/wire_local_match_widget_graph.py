@@ -8,6 +8,7 @@ Notes:
 - Use --clear for deterministic rebuild from scratch.
 - Rebinds 6 button OnClicked events and wires functional chains.
 - BtnRedMove is wired to a real SubmitMove test command using struct default text.
+- Pull nodes are wired to incremental cursor API to avoid replaying historical messages.
 - Default behavior does NOT touch existing Construct chain unless --wire-construct is specified.
 """
 
@@ -29,7 +30,6 @@ SUBSYSTEM_CLASS = "/Script/StupidChessCoreBridge.StupidChessLocalMatchSubsystem"
 MATCH_ID = "900"
 RED_PLAYER_ID = "10001"
 BLACK_PLAYER_ID = "10002"
-AFTER_SERVER_SEQUENCE = "0"
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,8 @@ class EventIds:
     BtnBlackResign: str
     BtnPullRed: str
     BtnPullBlack: str
+    BtnResetPullRed: str | None = None
+    BtnResetPullBlack: str | None = None
 
 
 def send_command(command: str, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -165,6 +167,92 @@ def add_button_click_log(button_name: str, node_x: int, node_y: int) -> str:
         },
     )
 
+def add_incremental_pull(node_x: int, node_y: int, player_id: str, reset_cursor: bool = False) -> str:
+    return add_call(
+        target="UStupidChessLocalMatchSubsystem",
+        function_name="PullParseAndDispatchOutboundMessagesIncremental",
+        node_x=node_x,
+        node_y=node_y,
+        params={
+            "PlayerId": player_id,
+            "bResetCursorBeforePull": reset_cursor,
+        },
+    )
+
+
+def add_pull_cursor_logs_after(
+    exec_source_node_id: str,
+    subsystem_getter_node_id: str,
+    player_id: str,
+    label: str,
+    node_x: int,
+    node_y: int,
+) -> str:
+    get_cursor = add_call(
+        target="UStupidChessLocalMatchSubsystem",
+        function_name="GetPullCursor",
+        node_x=node_x,
+        node_y=node_y - 180,
+        params={"PlayerId": player_id},
+    )
+    conv_to_string = add_call(
+        target="UKismetStringLibrary",
+        function_name="Conv_Int64ToString",
+        node_x=node_x + 360,
+        node_y=node_y - 180,
+    )
+    label_print = add_call(
+        target="UKismetSystemLibrary",
+        function_name="PrintString",
+        node_x=node_x,
+        node_y=node_y,
+        params={
+            "InString": f"[Cursor][{label}]",
+            "Duration": 2.0,
+        },
+    )
+    value_print = add_call(
+        target="UKismetSystemLibrary",
+        function_name="PrintString",
+        node_x=node_x + 360,
+        node_y=node_y,
+        params={"Duration": 2.0},
+    )
+
+    connect_data(subsystem_getter_node_id, "ReturnValue", get_cursor, "self")
+    connect_data(get_cursor, "ReturnValue", conv_to_string, "InInt")
+    connect_data(conv_to_string, "ReturnValue", value_print, "InString")
+
+    connect_exec(exec_source_node_id, label_print)
+    connect_exec(label_print, value_print)
+    return value_print
+
+
+def add_cached_summary_log_after(
+    exec_source_node_id: str,
+    subsystem_getter_node_id: str,
+    summary_function_name: str,
+    node_x: int,
+    node_y: int,
+) -> str:
+    get_summary = add_call(
+        target="UStupidChessLocalMatchSubsystem",
+        function_name=summary_function_name,
+        node_x=node_x,
+        node_y=node_y,
+    )
+    print_summary = add_call(
+        target="UKismetSystemLibrary",
+        function_name="PrintString",
+        node_x=node_x + 420,
+        node_y=node_y,
+        params={"Duration": 2.0},
+    )
+    connect_data(subsystem_getter_node_id, "ReturnValue", get_summary, "self")
+    connect_data(get_summary, "ReturnValue", print_summary, "InString")
+    connect_exec(exec_source_node_id, print_summary)
+    return print_summary
+
 
 def bind_buttons() -> EventIds:
     button_positions = {
@@ -174,22 +262,29 @@ def bind_buttons() -> EventIds:
         "BtnBlackResign": (-2800, 900),
         "BtnPullRed": (-2800, 1500),
         "BtnPullBlack": (-2800, 1900),
+        "BtnResetPullRed": (-2800, 2300),
+        "BtnResetPullBlack": (-2800, 2700),
     }
     ids: Dict[str, str] = {}
     for button_name, node_position in button_positions.items():
-        result = require_success(
-            send_command(
-                "bind_widget_event",
-                {
-                    "blueprint_name": BLUEPRINT_NAME,
-                    "widget_name": button_name,
-                    "event_name": "OnClicked",
-                    "function_name": f"On{button_name}Clicked",
-                    "node_position": [node_position[0], node_position[1]],
-                },
-            ),
-            f"bind_widget_event({button_name})",
+        bind_result = send_command(
+            "bind_widget_event",
+            {
+                "blueprint_name": BLUEPRINT_NAME,
+                "widget_name": button_name,
+                "event_name": "OnClicked",
+                "function_name": f"On{button_name}Clicked",
+                "node_position": [node_position[0], node_position[1]],
+            },
         )
+        if bind_result.get("status") != "success":
+            # Optional debug buttons may not exist in older widget versions.
+            if button_name in ("BtnResetPullRed", "BtnResetPullBlack"):
+                print(f"[INFO] Optional button not found, skip wiring: {button_name}")
+                continue
+            raise RuntimeError(f"bind_widget_event({button_name}) failed: {json.dumps(bind_result, ensure_ascii=False)}")
+
+        result = bind_result
         bound_node_id = result["result"]["node_id"]
         dedupe_result = require_success(
             send_command(
@@ -296,16 +391,16 @@ def wire_construct_delegate_bindings() -> None:
     getter_subsystem = add_get_subsystem(-3200, -2200)
 
     delegate_logs = [
-        ("OnJoinAckParsed", "[Callback][JoinAck]"),
-        ("OnCommandAckParsed", "[Callback][CommandAck]"),
-        ("OnErrorParsed", "[Callback][Error]"),
-        ("OnSnapshotParsed", "[Callback][Snapshot]"),
-        ("OnEventDeltaParsed", "[Callback][EventDelta]"),
-        ("OnGameOverParsed", "[Callback][GameOver]"),
+        ("OnJoinAckParsed", "[Callback][JoinAck]", None),
+        ("OnCommandAckParsed", "[Callback][CommandAck]", "GetCachedCommandAckDebugString"),
+        ("OnErrorParsed", "[Callback][Error]", None),
+        ("OnSnapshotParsed", "[Callback][Snapshot]", None),
+        ("OnEventDeltaParsed", "[Callback][EventDelta]", None),
+        ("OnGameOverParsed", "[Callback][GameOver]", "GetCachedGameOverDebugString"),
     ]
 
     previous_exec_node = construct_event
-    for index, (delegate_name, log_text) in enumerate(delegate_logs):
+    for index, (delegate_name, log_text, summary_function_name) in enumerate(delegate_logs):
         base_y = -2200 + index * 280
         assign_node, custom_event_node = bind_multicast_delegate(
             delegate_name=delegate_name,
@@ -325,6 +420,17 @@ def wire_construct_delegate_bindings() -> None:
             },
         )
         connect_exec(custom_event_node, print_node)
+        callback_tail = print_node
+        if summary_function_name is not None:
+            callback_tail = add_cached_summary_log_after(
+                exec_source_node_id=print_node,
+                subsystem_getter_node_id=getter_subsystem,
+                summary_function_name=summary_function_name,
+                node_x=-1200,
+                node_y=base_y + 120,
+            )
+            # callback_tail is intentionally unused afterwards for now; kept for future extension.
+            _ = callback_tail
         previous_exec_node = assign_node
 
 
@@ -346,20 +452,8 @@ def wire_join_chain(events: EventIds) -> None:
         -900,
         {"MatchId": MATCH_ID, "PlayerId": BLACK_PLAYER_ID},
     )
-    pull_red = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -650,
-        -900,
-        {"PlayerId": RED_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
-    pull_black = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -250,
-        -900,
-        {"PlayerId": BLACK_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
+    pull_red = add_incremental_pull(-650, -900, RED_PLAYER_ID)
+    pull_black = add_incremental_pull(-250, -900, BLACK_PLAYER_ID)
 
     for node_id in [reset_local_server, join_red, join_black, pull_red, pull_black]:
         connect_data(getter_subsystem, "ReturnValue", node_id, "self")
@@ -369,7 +463,23 @@ def wire_join_chain(events: EventIds) -> None:
     connect_exec(reset_local_server, join_red)
     connect_exec(join_red, join_black)
     connect_exec(join_black, pull_red)
-    connect_exec(pull_red, pull_black)
+    pull_red_cursor_log = add_pull_cursor_logs_after(
+        exec_source_node_id=pull_red,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=RED_PLAYER_ID,
+        label="Red",
+        node_x=-760,
+        node_y=-660,
+    )
+    connect_exec(pull_red_cursor_log, pull_black)
+    add_pull_cursor_logs_after(
+        exec_source_node_id=pull_black,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=BLACK_PLAYER_ID,
+        label="Black",
+        node_x=-360,
+        node_y=-660,
+    )
 
 
 def wire_commit_reveal_chain(events: EventIds) -> None:
@@ -417,20 +527,8 @@ def wire_commit_reveal_chain(events: EventIds) -> None:
         -300,
         {"MatchId": MATCH_ID, "PlayerId": BLACK_PLAYER_ID, "Side": "Black", "Nonce": "B"},
     )
-    pull_red = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -250,
-        -300,
-        {"PlayerId": RED_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
-    pull_black = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        150,
-        -300,
-        {"PlayerId": BLACK_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
+    pull_red = add_incremental_pull(-250, -300, RED_PLAYER_ID)
+    pull_black = add_incremental_pull(150, -300, BLACK_PLAYER_ID)
 
     for node_id in [commit_red, commit_black, placements_red, reveal_red, placements_black, reveal_black, pull_red, pull_black]:
         connect_data(getter_subsystem, "ReturnValue", node_id, "self")
@@ -444,7 +542,23 @@ def wire_commit_reveal_chain(events: EventIds) -> None:
     connect_exec(commit_black, reveal_red)
     connect_exec(reveal_red, reveal_black)
     connect_exec(reveal_black, pull_red)
-    connect_exec(pull_red, pull_black)
+    pull_red_cursor_log = add_pull_cursor_logs_after(
+        exec_source_node_id=pull_red,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=RED_PLAYER_ID,
+        label="Red",
+        node_x=-360,
+        node_y=-60,
+    )
+    connect_exec(pull_red_cursor_log, pull_black)
+    add_pull_cursor_logs_after(
+        exec_source_node_id=pull_black,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=BLACK_PLAYER_ID,
+        label="Black",
+        node_x=40,
+        node_y=-60,
+    )
 
 
 def wire_red_move_chain(events: EventIds) -> None:
@@ -475,20 +589,8 @@ def wire_red_move_chain(events: EventIds) -> None:
             "Side": "Red",
         },
     )
-    pull_red = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -500,
-        300,
-        {"PlayerId": RED_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
-    pull_black = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -100,
-        300,
-        {"PlayerId": BLACK_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
+    pull_red = add_incremental_pull(-500, 300, RED_PLAYER_ID)
+    pull_black = add_incremental_pull(-100, 300, BLACK_PLAYER_ID)
 
     for node_id in [submit_move, pull_red, pull_black]:
         connect_data(getter_subsystem, "ReturnValue", node_id, "self")
@@ -497,7 +599,23 @@ def wire_red_move_chain(events: EventIds) -> None:
     connect_exec(events.BtnRedMove, click_log)
     connect_exec(click_log, submit_move)
     connect_exec(submit_move, pull_red)
-    connect_exec(pull_red, pull_black)
+    pull_red_cursor_log = add_pull_cursor_logs_after(
+        exec_source_node_id=pull_red,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=RED_PLAYER_ID,
+        label="Red",
+        node_x=-620,
+        node_y=540,
+    )
+    connect_exec(pull_red_cursor_log, pull_black)
+    add_pull_cursor_logs_after(
+        exec_source_node_id=pull_black,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=BLACK_PLAYER_ID,
+        label="Black",
+        node_x=-220,
+        node_y=540,
+    )
 
 
 def wire_black_resign_chain(events: EventIds) -> None:
@@ -510,20 +628,8 @@ def wire_black_resign_chain(events: EventIds) -> None:
         900,
         {"MatchId": MATCH_ID, "PlayerId": BLACK_PLAYER_ID, "Side": "Black"},
     )
-    pull_red = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -1450,
-        900,
-        {"PlayerId": RED_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
-    pull_black = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -1050,
-        900,
-        {"PlayerId": BLACK_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
+    pull_red = add_incremental_pull(-1450, 900, RED_PLAYER_ID)
+    pull_black = add_incremental_pull(-1050, 900, BLACK_PLAYER_ID)
 
     for node_id in [resign_black, pull_red, pull_black]:
         connect_data(getter_subsystem, "ReturnValue", node_id, "self")
@@ -531,35 +637,89 @@ def wire_black_resign_chain(events: EventIds) -> None:
     connect_exec(events.BtnBlackResign, click_log)
     connect_exec(click_log, resign_black)
     connect_exec(resign_black, pull_red)
-    connect_exec(pull_red, pull_black)
+    pull_red_cursor_log = add_pull_cursor_logs_after(
+        exec_source_node_id=pull_red,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=RED_PLAYER_ID,
+        label="Red",
+        node_x=-1560,
+        node_y=1140,
+    )
+    connect_exec(pull_red_cursor_log, pull_black)
+    add_pull_cursor_logs_after(
+        exec_source_node_id=pull_black,
+        subsystem_getter_node_id=getter_subsystem,
+        player_id=BLACK_PLAYER_ID,
+        label="Black",
+        node_x=-1160,
+        node_y=1140,
+    )
 
 
 def wire_pull_buttons(events: EventIds) -> None:
     click_log_red = add_button_click_log("BtnPullRed", -2550, 1500)
     getter_subsystem_red = add_get_subsystem(-2300, 1500)
-    pull_red = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -1850,
-        1500,
-        {"PlayerId": RED_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
+    pull_red = add_incremental_pull(-1850, 1500, RED_PLAYER_ID)
     connect_data(getter_subsystem_red, "ReturnValue", pull_red, "self")
     connect_exec(events.BtnPullRed, click_log_red)
     connect_exec(click_log_red, pull_red)
+    add_pull_cursor_logs_after(
+        exec_source_node_id=pull_red,
+        subsystem_getter_node_id=getter_subsystem_red,
+        player_id=RED_PLAYER_ID,
+        label="Red",
+        node_x=-1960,
+        node_y=1740,
+    )
 
     click_log_black = add_button_click_log("BtnPullBlack", -2550, 1900)
     getter_subsystem_black = add_get_subsystem(-2300, 1900)
-    pull_black = add_call(
-        "UStupidChessLocalMatchSubsystem",
-        "PullParseAndDispatchOutboundMessages",
-        -1850,
-        1900,
-        {"PlayerId": BLACK_PLAYER_ID, "AfterServerSequence": AFTER_SERVER_SEQUENCE},
-    )
+    pull_black = add_incremental_pull(-1850, 1900, BLACK_PLAYER_ID)
     connect_data(getter_subsystem_black, "ReturnValue", pull_black, "self")
     connect_exec(events.BtnPullBlack, click_log_black)
     connect_exec(click_log_black, pull_black)
+    add_pull_cursor_logs_after(
+        exec_source_node_id=pull_black,
+        subsystem_getter_node_id=getter_subsystem_black,
+        player_id=BLACK_PLAYER_ID,
+        label="Black",
+        node_x=-1960,
+        node_y=2140,
+    )
+
+
+def wire_reset_pull_buttons(events: EventIds) -> None:
+    if events.BtnResetPullRed is not None:
+        click_log_red = add_button_click_log("BtnResetPullRed", -2550, 2300)
+        getter_subsystem_red = add_get_subsystem(-2300, 2300)
+        reset_pull_red = add_incremental_pull(-1850, 2300, RED_PLAYER_ID, reset_cursor=True)
+        connect_data(getter_subsystem_red, "ReturnValue", reset_pull_red, "self")
+        connect_exec(events.BtnResetPullRed, click_log_red)
+        connect_exec(click_log_red, reset_pull_red)
+        add_pull_cursor_logs_after(
+            exec_source_node_id=reset_pull_red,
+            subsystem_getter_node_id=getter_subsystem_red,
+            player_id=RED_PLAYER_ID,
+            label="RedResetPull",
+            node_x=-1960,
+            node_y=2540,
+        )
+
+    if events.BtnResetPullBlack is not None:
+        click_log_black = add_button_click_log("BtnResetPullBlack", -2550, 2700)
+        getter_subsystem_black = add_get_subsystem(-2300, 2700)
+        reset_pull_black = add_incremental_pull(-1850, 2700, BLACK_PLAYER_ID, reset_cursor=True)
+        connect_data(getter_subsystem_black, "ReturnValue", reset_pull_black, "self")
+        connect_exec(events.BtnResetPullBlack, click_log_black)
+        connect_exec(click_log_black, reset_pull_black)
+        add_pull_cursor_logs_after(
+            exec_source_node_id=reset_pull_black,
+            subsystem_getter_node_id=getter_subsystem_black,
+            player_id=BLACK_PLAYER_ID,
+            label="BlackResetPull",
+            node_x=-1960,
+            node_y=2940,
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -594,7 +754,19 @@ def main() -> int:
             print("[INFO] Preserve mode still performs event-chain cleanup + bound-event dedupe for button paths.")
 
         events = bind_buttons()
-        for event_node_id in [events.BtnJoin, events.BtnCommitReveal, events.BtnRedMove, events.BtnBlackResign, events.BtnPullRed, events.BtnPullBlack]:
+        event_nodes_to_clear = [
+            events.BtnJoin,
+            events.BtnCommitReveal,
+            events.BtnRedMove,
+            events.BtnBlackResign,
+            events.BtnPullRed,
+            events.BtnPullBlack,
+        ]
+        if events.BtnResetPullRed is not None:
+            event_nodes_to_clear.append(events.BtnResetPullRed)
+        if events.BtnResetPullBlack is not None:
+            event_nodes_to_clear.append(events.BtnResetPullBlack)
+        for event_node_id in event_nodes_to_clear:
             clear_event_exec_chain(event_node_id)
         if args.wire_construct:
             wire_construct_delegate_bindings()
@@ -605,6 +777,7 @@ def main() -> int:
         wire_red_move_chain(events)
         wire_black_resign_chain(events)
         wire_pull_buttons(events)
+        wire_reset_pull_buttons(events)
 
         compile_result = require_success(
             send_command("compile_blueprint", {"blueprint_name": BLUEPRINT_NAME}),

@@ -26,6 +26,10 @@
    - 会按预设坐标放置红色事件入口节点，保持图可读性。
    - Subsystem 获取节点改为 MCP 新命令 `add_blueprint_subsystem_getter_node`（对应 UE 蓝图里的 `GetStupidChessLocalMatchSubsystem` 样式）。
    - `BtnRedMove` 会接真实 `SubmitMove` 测试链路（通过 `MakeStruct(StupidChessMoveCommand)` 节点接入 `Move` by-ref 引脚）。
+   - 所有拉取节点默认接 `PullParseAndDispatchOutboundMessagesIncremental`，由 Subsystem 自动维护每玩家游标，避免重复回调噪声。
+   - 所有拉取节点后会自动打印当前玩家 `GetPullCursor(PlayerId)`（标签 + 数值），便于验证增量拉取是否生效。
+   - 若 Widget 中存在 `BtnResetPullRed` / `BtnResetPullBlack`（可选），脚本会自动接“`PullParseAndDispatchOutboundMessagesIncremental(..., bResetCursorBeforePull=true)` + 游标日志”调试链路，用于验证重放拉取。
+   - 使用 `--wire-construct` 重建委托绑定链路时，会在 `OnCommandAckParsed` / `OnGameOverParsed` 回调后额外打印缓存摘要字符串（关键字段），便于快速判断接受结果与终局结果。
    - 脚本会先清理 6 个按钮事件节点的旧执行链，再重接新链路，避免 Preserve 模式下历史链路（如旧 TODO 分支）继续触发。
    - 用法：
      - `python tools\wire_local_match_widget_graph.py`

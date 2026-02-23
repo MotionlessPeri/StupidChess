@@ -123,6 +123,7 @@ void UStupidChessLocalMatchSubsystem::ResetLocalServer()
     ServerRuntime = new FStupidChessServerRuntime();
     NextClientSequence = 1;
     LastPulledMessages.Reset();
+    PullCursorByPlayer.Reset();
     ResetParsedCache();
 }
 
@@ -542,6 +543,55 @@ int32 UStupidChessLocalMatchSubsystem::PullParseAndDispatchOutboundMessages(int6
     return ParsedCount;
 }
 
+int32 UStupidChessLocalMatchSubsystem::PullParseAndDispatchOutboundMessagesIncremental(int64 PlayerId, bool bResetCursorBeforePull)
+{
+    if (PlayerId <= 0)
+    {
+        return 0;
+    }
+
+    if (bResetCursorBeforePull)
+    {
+        PullCursorByPlayer.Remove(PlayerId);
+    }
+
+    const int64 CurrentCursor = PullCursorByPlayer.FindRef(PlayerId);
+    const int32 ParsedCount = PullParseAndDispatchOutboundMessages(PlayerId, CurrentCursor);
+
+    int64 LatestCursor = CurrentCursor;
+    for (const FStupidChessOutboundMessage& Message : LastPulledMessages)
+    {
+        if (Message.ServerSequence > LatestCursor)
+        {
+            LatestCursor = Message.ServerSequence;
+        }
+    }
+
+    PullCursorByPlayer.Add(PlayerId, LatestCursor);
+    return ParsedCount;
+}
+
+void UStupidChessLocalMatchSubsystem::ResetPullCursor(int64 PlayerId)
+{
+    if (PlayerId <= 0)
+    {
+        PullCursorByPlayer.Reset();
+        return;
+    }
+
+    PullCursorByPlayer.Remove(PlayerId);
+}
+
+int64 UStupidChessLocalMatchSubsystem::GetPullCursor(int64 PlayerId) const
+{
+    if (PlayerId <= 0)
+    {
+        return 0;
+    }
+
+    return PullCursorByPlayer.FindRef(PlayerId);
+}
+
 TArray<FStupidChessOutboundMessage> UStupidChessLocalMatchSubsystem::GetLastPulledMessages() const
 {
     return LastPulledMessages;
@@ -772,6 +822,20 @@ bool UStupidChessLocalMatchSubsystem::GetCachedCommandAck(FStupidChessCommandAck
     return true;
 }
 
+FString UStupidChessLocalMatchSubsystem::GetCachedCommandAckDebugString() const
+{
+    if (!bHasCachedCommandAck)
+    {
+        return TEXT("[CommandAck] <none>");
+    }
+
+    return FString::Printf(
+        TEXT("[CommandAck] Accepted=%s ErrorCode=%s ErrorMessage=%s"),
+        CachedCommandAck.bAccepted ? TEXT("true") : TEXT("false"),
+        CachedCommandAck.ErrorCode.IsEmpty() ? TEXT("<empty>") : *CachedCommandAck.ErrorCode,
+        CachedCommandAck.ErrorMessage.IsEmpty() ? TEXT("<empty>") : *CachedCommandAck.ErrorMessage);
+}
+
 bool UStupidChessLocalMatchSubsystem::GetCachedError(FStupidChessErrorView& OutError) const
 {
     if (!bHasCachedError)
@@ -814,6 +878,22 @@ bool UStupidChessLocalMatchSubsystem::GetCachedGameOver(FStupidChessGameOverView
 
     OutGameOver = CachedGameOver;
     return true;
+}
+
+FString UStupidChessLocalMatchSubsystem::GetCachedGameOverDebugString() const
+{
+    if (!bHasCachedGameOver)
+    {
+        return TEXT("[GameOver] <none>");
+    }
+
+    return FString::Printf(
+        TEXT("[GameOver] Result=%d EndReason=%d TurnIndex=%lld IsDraw=%s WinnerSide=%d"),
+        CachedGameOver.Result,
+        CachedGameOver.EndReason,
+        static_cast<long long>(CachedGameOver.TurnIndex),
+        CachedGameOver.bIsDraw ? TEXT("true") : TEXT("false"),
+        CachedGameOver.WinnerSide);
 }
 
 int64 UStupidChessLocalMatchSubsystem::GetNextClientSequence() const

@@ -161,18 +161,34 @@
     - 使用 `python tools/wire_local_match_widget_graph.py --clear --wire-construct` 执行 destructive 清图重建，移除历史重复/孤立节点（本次清理 `removed_count=125`）。
     - 按钮事件入口与主链路已重建为单份可读图，不再依赖 Preserve 模式下残留节点。
     - 重建后蓝图编译通过并落盘：`compiled=true`，`/Game/WBP_LocalMatchDebug` 已保存。
+50. UE 增量拉取游标接入：
+    - `UStupidChessLocalMatchSubsystem` 新增 `PullParseAndDispatchOutboundMessagesIncremental`，按玩家维护 `ServerSequence` 游标，默认只拉取新消息。
+    - 新增 `ResetPullCursor` 与 `GetPullCursor`，支持按玩家/全量重置与调试观测。
+    - `tools/wire_local_match_widget_graph.py` 与 `clients/ue/BlueprintQuickStart.md` 已切换到增量拉取接口，减少重复回调噪声。
+    - 新增 UE 自动化用例 `StupidChess.UE.CoreBridge.IncrementalPull`，覆盖“首拉->空拉->新消息->重置游标重拉”路径。
+    - 修复 UE 5.7 编译兼容：`StupidChessLocalMatchSubsystemTests` 中 `TestEqual(int64, 0)` 改为显式 `int64{0}`，消除重载歧义。
+51. `WBP_LocalMatchDebug` 游标可视化日志接线：
+    - `tools/wire_local_match_widget_graph.py` 在每个增量拉取节点后自动追加 `GetPullCursor(PlayerId)` 调试日志（标签 + 数值）。
+    - 便于在 PIE 中确认“空拉不增长 / 新消息后增长 / 重置后回退”的游标行为。
+52. `WBP_LocalMatchDebug` 重置游标拉取调试按钮接线：
+    - `tools/wire_local_match_widget_graph.py` 支持可选按钮 `BtnResetPullRed / BtnResetPullBlack`。
+    - 若按钮存在，脚本自动接入 `PullParseAndDispatchOutboundMessagesIncremental(..., bResetCursorBeforePull=true)` 链路并打印游标。
+    - 用于在 PIE 中验证“强制重放拉取”行为，不影响原有普通 Pull 按钮。
+53. 回调关键字段调试摘要（脚本/Subsystem）：
+    - `UStupidChessLocalMatchSubsystem` 新增 `GetCachedCommandAckDebugString` / `GetCachedGameOverDebugString`。
+    - `tools/wire_local_match_widget_graph.py` 在 `--wire-construct` 模式下，`OnCommandAckParsed` / `OnGameOverParsed` 回调会额外打印缓存摘要字符串。
+    - 目标是降低仅靠事件名排查问题时的信息不足。
 
 ## In Progress
 
 1. 在新脚本链路上做一次稳定回归（Join -> CommitReveal -> Move -> Resign）并记录期望日志断言。
-2. 评估是否将 `AfterServerSequence` 从固定 `0` 升级为增量游标拉取，减少重复回调噪声。
-3. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
+2. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
 
 ## Next Steps
 
 1. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
-2. 为 `Pull` 增加增量游标模式，降低重复回调噪声。
-3. 增加一键“仅重接按钮链路”的自动化回归脚本（不触碰 Construct）。
+2. 增加一键“仅重接按钮链路”的自动化回归脚本（不触碰 Construct）。
+3. 为 `Snapshot/EventDelta` 增加轻量调试摘要（例如阶段/回合/事件数），避免日志信息过载但仍可判定状态推进。
 
 ## Test Baseline
 
@@ -180,3 +196,4 @@
 2. `Build.bat StupidChessUEEditor Win64 Development ...` 当前编译通过（UE 5.7）。
 3. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.LocalFlow;Quit" -culture=en` 当前通过（EXIT CODE: 0）。
 4. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.ErrorPaths;Quit" -culture=en` 当前通过（EXIT CODE: 0）。
+5. `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests StupidChess.UE.CoreBridge.IncrementalPull;Quit" -culture=en` 当前通过（EXIT CODE: 0）。

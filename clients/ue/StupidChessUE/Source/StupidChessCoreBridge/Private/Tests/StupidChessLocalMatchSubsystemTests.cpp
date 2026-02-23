@@ -382,4 +382,60 @@ bool FStupidChessLocalMatchSubsystemErrorPathsTest::RunTest(const FString& Param
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FStupidChessLocalMatchSubsystemIncrementalPullTest,
+    "StupidChess.UE.CoreBridge.IncrementalPull",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStupidChessLocalMatchSubsystemIncrementalPullTest::RunTest(const FString& Parameters)
+{
+    (void)Parameters;
+
+    constexpr int64 MatchId = 902;
+    constexpr int64 PlayerId = 12001;
+
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    TestNotNull(TEXT("GameInstance should be created for subsystem outer."), GameInstance);
+    if (GameInstance == nullptr)
+    {
+        return false;
+    }
+
+    UStupidChessLocalMatchSubsystem* Subsystem = NewObject<UStupidChessLocalMatchSubsystem>(GameInstance);
+    TestNotNull(TEXT("Subsystem should be created."), Subsystem);
+    if (Subsystem == nullptr)
+    {
+        return false;
+    }
+
+    Subsystem->ResetLocalServer();
+    TestTrue(TEXT("Player should join local match."), Subsystem->JoinLocalMatch(MatchId, PlayerId));
+
+    const int32 FirstPullParsedCount = Subsystem->PullParseAndDispatchOutboundMessagesIncremental(PlayerId, true);
+    TestTrue(TEXT("First incremental pull should parse at least one message."), FirstPullParsedCount >= 1);
+    const int64 CursorAfterFirstPull = Subsystem->GetPullCursor(PlayerId);
+    TestTrue(TEXT("Cursor should advance after first incremental pull."), CursorAfterFirstPull > 0);
+
+    const int32 SecondPullParsedCount = Subsystem->PullParseAndDispatchOutboundMessagesIncremental(PlayerId);
+    TestEqual(TEXT("Second incremental pull without new messages should parse zero."), SecondPullParsedCount, 0);
+    TestEqual(TEXT("Cursor should remain unchanged without new messages."),
+              Subsystem->GetPullCursor(PlayerId),
+              CursorAfterFirstPull);
+
+    TestFalse(TEXT("Pass in setup phase should be rejected by server and emit command ack."),
+              Subsystem->SubmitPass(MatchId, PlayerId, EStupidChessSide::Red));
+    const int32 ThirdPullParsedCount = Subsystem->PullParseAndDispatchOutboundMessagesIncremental(PlayerId);
+    TestEqual(TEXT("Incremental pull after one rejected command should parse one command ack."), ThirdPullParsedCount, 1);
+    TestTrue(TEXT("Cursor should continue advancing after new messages."),
+             Subsystem->GetPullCursor(PlayerId) > CursorAfterFirstPull);
+
+    Subsystem->ResetPullCursor(PlayerId);
+    TestEqual(TEXT("ResetPullCursor should clear per-player cursor."), Subsystem->GetPullCursor(PlayerId), int64{0});
+    const int32 FullReplayParsedCount = Subsystem->PullParseAndDispatchOutboundMessagesIncremental(PlayerId);
+    TestTrue(TEXT("Pull after cursor reset should replay historical messages."), FullReplayParsedCount >= 2);
+
+    Subsystem->Deinitialize();
+    return true;
+}
+
 #endif
