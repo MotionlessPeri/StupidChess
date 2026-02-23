@@ -39,6 +39,10 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
    - 读场景演员（例如 `get_actors_in_level`）。
    - 读蓝图节点（例如 `find_blueprint_nodes`，支持 `/Game/WBP_LocalMatchDebug` 这种完整路径）。
 4. 蓝图改动后在 UE 内执行 `Compile + Save`，再做一次读取校验。
+5. 需要冷编译插件前，优先使用 MCP 编辑器生命周期命令而不是手动强关：
+   - `save_dirty_assets`
+   - `request_editor_exit`
+   - `save_and_exit_editor`（推荐，先保存再延迟退出，降低 MCP 回包被截断概率）
 
 ## 已验证能力
 
@@ -95,6 +99,9 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 9. 运行 `wire_local_match_widget_graph.py` 后按钮仍出现多条重复分支:
    - 先确认插件二进制已包含 `dedupe_blueprint_component_bound_events`。
    - 若命令未知，按上一条流程重启 UE 并重编译插件。
+10. 需要频繁重编插件导致反复手动关闭 UE:
+   - 使用 `save_and_exit_editor` 让编辑器在 MCP 回包后延迟退出，再执行 `Build.bat` 冷编译。
+   - 若仍无法退出，检查是否有调试器附加或弹窗阻塞（保存提示/确认框）。
 
 ## 本地直连自检（可选）
 

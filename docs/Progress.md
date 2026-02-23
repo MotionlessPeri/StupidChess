@@ -193,12 +193,19 @@
 57. `Construct` 入口运行时探针：
     - `tools/wire_local_match_widget_graph.py` 在 `--wire-construct` 重建的 `Event Construct` 链首节点插入 `PrintString("[Construct][Enter]")`。
     - 用于快速验证 MCP 创建的 `Event Construct` 是否在 PIE 运行时实际触发。
+58. UnrealMCP 编辑器生命周期命令已同步并完成消费者侧 smoke：
+    - 新增 MCP 命令：`save_dirty_assets`、`request_editor_exit`、`save_and_exit_editor`（来自 fork `MotionlessPeri/unreal-mcp`）。
+    - 命令通过 `UnrealMCPBridge` 路由到 Editor 命令集，并已在 `StupidChessUE` 会话中验证：
+      - `save_dirty_assets` 可返回脏包保存前后计数。
+      - `save_and_exit_editor` 可先回 MCP 响应，再延迟退出 UE Editor（避免回包被关机截断）。
+    - `clients/ue/McpBlueprintWorkflow.md` 已补充“优先使用 MCP 保存并关闭 Editor 再冷编译插件”的工作流口径。
 
 ## In Progress
 
 1. 在新脚本链路上做一次稳定回归（Join -> CommitReveal -> Move -> Resign）并记录期望日志断言。
 2. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
 3. 整理 `WBP_ClickProbe` 与 `DefaultEngine.ini` 的入库策略（长期调试资产 vs 本地开发偏好）。
+4. 回到 `unreal-mcp` Route B：恢复并继续 UMG Designer 自动化阶段 `0+1`（命令口径对齐 + `get_widget_tree`）。
 
 ## Next Steps
 
@@ -206,6 +213,7 @@
 2. 增加一键“仅重接按钮链路”的自动化回归脚本（不触碰 Construct）。
 3. 为 `Snapshot/EventDelta` 增加轻量调试摘要（例如阶段/回合/事件数），避免日志信息过载但仍可判定状态推进。
 4. 决定是否将 `DebugLevel` 设为团队默认启动地图，并据此处理 `DefaultEngine.ini` 改动。
+5. 在 `unreal-mcp` 中继续补齐 UMG Designer 自动化能力，并用 `WBP_McpUmgProbe` 做阶段性 smoke。
 
 ## Test Baseline
 
