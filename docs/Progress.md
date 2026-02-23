@@ -183,6 +183,13 @@
     - `.gitignore` 新增 `**/__pycache__/`，避免本地 Python 缓存目录进入工作区噪声。
     - `.gitignore` 新增 `clients/ue/**/*_HLOD*_Instancing.uasset`，屏蔽 UE HLOD 生成实例化资产（如 `TestLevel_HLOD0_Instancing.uasset`）。
     - 便于将 `DebugLevel.umap` 等手工资产与可再生生成物区分管理。
+55. 蓝图接线脚本 `Construct` 重建安全保护：
+    - `tools/wire_local_match_widget_graph.py` 在 Preserve 模式下改为跳过 `--wire-construct`（输出警告），避免重复执行导致 `Bind Event + Custom Event` 成对堆积。
+    - 文档 `tools/README.md` 与 `clients/ue/McpBlueprintWorkflow.md` 已同步“需要重建 Construct 请使用 `--clear --wire-construct`”口径。
+56. UnrealMCP `add_blueprint_event_node` 生命周期事件修复（fork 同步）：
+    - 在 fork `MotionlessPeri/unreal-mcp` 中将事件节点创建由手工 `NewObject<UK2Node_Event>` 改为 `FKismetEditorUtilities::AddDefaultEventNode`。
+    - 修复 `WidgetBlueprint` 中 `Event Construct` 等 override/lifecycle 事件“节点可见但运行时不触发”的问题。
+    - 已通过 `tools/sync_unreal_mcp.ps1` 同步到本仓插件副本，并在 `StupidChessUEEditor` 冷编译下验证通过。
 
 ## In Progress
 

@@ -732,7 +732,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--wire-construct",
         action="store_true",
-        help="Also (re)build Construct->delegate bindings. Disabled by default to preserve manual Construct chains.",
+        help=(
+            "Also (re)build Construct->delegate bindings. "
+            "For safety this is only applied with --clear; in Preserve mode it is skipped "
+            "to avoid duplicate Bind Event/Custom Event chains."
+        ),
     )
     return parser.parse_args()
 
@@ -768,7 +772,12 @@ def main() -> int:
             event_nodes_to_clear.append(events.BtnResetPullBlack)
         for event_node_id in event_nodes_to_clear:
             clear_event_exec_chain(event_node_id)
-        if args.wire_construct:
+        if args.wire_construct and not args.clear:
+            print(
+                "[WARN] Skip Construct wiring in Preserve mode: current script cannot dedupe "
+                "existing Construct delegate bindings safely. Use --clear --wire-construct for a clean rebuild."
+            )
+        elif args.wire_construct:
             wire_construct_delegate_bindings()
         else:
             print("[INFO] Skip Construct wiring (--wire-construct not set).")

@@ -53,9 +53,13 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 9. `find_blueprint_nodes` 现支持通过地图资产名/路径解析 Level Blueprint（`ULevelScriptBlueprint`），例如 `DebugLevel` 或 `/Game/DebugLevel`。
 10. 新增 `add_blueprint_subsystem_getter_node`：可直接创建 `Get <YourSubsystem>` 节点（基于 `UK2Node_GetSubsystem`），避免“通用 `Get Game Instance Subsystem + Cast`”手工拼接。
 11. `tools/wire_local_match_widget_graph.py` 默认不重建 `Construct`，避免覆盖手工链路；需要自动重建委托绑定时显式使用 `--wire-construct`。
-12. 新增 `add_blueprint_make_struct_node`：可创建 `UK2Node_MakeStruct` 并设置字段默认值，适配 `SubmitMove` 这类 by-ref 结构体入参。
-13. 新增 `break_blueprint_node_pin_links`：可按节点+引脚断开旧连线，用于 Preserve 模式下重接按钮链路时清理历史分支。
-14. 新增 `dedupe_blueprint_component_bound_events`：可按 `widget_name + event_name` 清理重复 `ComponentBoundEvent` 及其旧执行链，防止按钮入口重复残留。
+12. 安全限制：当前脚本在 `Preserve` 模式下会跳过 `--wire-construct`（仅给出警告），避免重复执行导致 `Bind Event + Custom Event` 成对堆积；需要重建 `Construct` 时使用 `--clear --wire-construct`。
+13. 新增 `add_blueprint_make_struct_node`：可创建 `UK2Node_MakeStruct` 并设置字段默认值，适配 `SubmitMove` 这类 by-ref 结构体入参。
+14. 新增 `break_blueprint_node_pin_links`：可按节点+引脚断开旧连线，用于 Preserve 模式下重接按钮链路时清理历史分支。
+15. 新增 `dedupe_blueprint_component_bound_events`：可按 `widget_name + event_name` 清理重复 `ComponentBoundEvent` 及其旧执行链，防止按钮入口重复残留。
+16. `add_blueprint_event_node` 已修复 override/lifecycle 事件创建路径：
+   - 使用 `FKismetEditorUtilities::AddDefaultEventNode` 创建事件节点（而非直接构造 `UK2Node_Event`）。
+   - `WidgetBlueprint` 的 `Event Construct` 等生命周期事件现在创建后可正常在运行时触发。
 
 ## 能力边界（当前）
 

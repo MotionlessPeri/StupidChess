@@ -19,6 +19,7 @@
    - 对 `WBP_LocalMatchDebug` 执行“绑定事件 + 自动接线 + 编译”一键接线。
    - 默认不会改动现有 `Event Construct` 链路；如需重建委托绑定链路，显式传 `--wire-construct`。
    - `--wire-construct` 会自动补齐 `Event Construct` 下的 `On*Parsed` 委托绑定链路（`Assign Delegate` + 自动生成回调事件 + `PrintString`）。
+   - 安全限制：当前 `Preserve` 模式下不会执行 `Construct` 重建（会警告并跳过），避免重复执行后堆积第二套 `Bind Event + Custom Event` 链；需要重建 `Construct` 请使用 `--clear --wire-construct`。
    - 会在 6 个按钮入口自动插入点击日志（`[Click][Btn...]`），便于确认 `OnClicked` 是否触发。
    - 默认 `Preserve` 模式：不清图，保留 `Construct` 与自定义回调链路。
    - `Preserve` 模式会先做按钮事件去重（`dedupe_blueprint_component_bound_events`）并清理旧执行链（`clear_blueprint_event_exec_chain`），避免重复执行后堆积残留节点。
@@ -33,5 +34,6 @@
    - 脚本会先清理 6 个按钮事件节点的旧执行链，再重接新链路，避免 Preserve 模式下历史链路（如旧 TODO 分支）继续触发。
    - 用法：
      - `python tools\wire_local_match_widget_graph.py`
-     - `python tools\wire_local_match_widget_graph.py --wire-construct`
+     - `python tools\wire_local_match_widget_graph.py --wire-construct`（Preserve 模式下会跳过 Construct 重建并给出警告）
+     - `python tools\wire_local_match_widget_graph.py --clear --wire-construct`（完整清图重建，包含 Construct）
      - `python tools\wire_local_match_widget_graph.py --clear`
