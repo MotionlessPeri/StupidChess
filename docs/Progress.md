@@ -3,6 +3,7 @@
 ## Last Updated
 
 1. 2026-02-19
+2. 2026-02-23
 
 ## Current Milestone
 
@@ -178,17 +179,23 @@
     - `UStupidChessLocalMatchSubsystem` 新增 `GetCachedCommandAckDebugString` / `GetCachedGameOverDebugString`。
     - `tools/wire_local_match_widget_graph.py` 在 `--wire-construct` 模式下，`OnCommandAckParsed` / `OnGameOverParsed` 回调会额外打印缓存摘要字符串。
     - 目标是降低仅靠事件名排查问题时的信息不足。
+54. 仓库忽略规则补充（UE 调试资产清理）：
+    - `.gitignore` 新增 `**/__pycache__/`，避免本地 Python 缓存目录进入工作区噪声。
+    - `.gitignore` 新增 `clients/ue/**/*_HLOD*_Instancing.uasset`，屏蔽 UE HLOD 生成实例化资产（如 `TestLevel_HLOD0_Instancing.uasset`）。
+    - 便于将 `DebugLevel.umap` 等手工资产与可再生生成物区分管理。
 
 ## In Progress
 
 1. 在新脚本链路上做一次稳定回归（Join -> CommitReveal -> Move -> Resign）并记录期望日志断言。
 2. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
+3. 整理 `WBP_ClickProbe` 与 `DefaultEngine.ini` 的入库策略（长期调试资产 vs 本地开发偏好）。
 
 ## Next Steps
 
 1. 在蓝图层为 `S2C_GameOver` 增加终局 UI 流程（弹窗/结算态/重开入口）。
 2. 增加一键“仅重接按钮链路”的自动化回归脚本（不触碰 Construct）。
 3. 为 `Snapshot/EventDelta` 增加轻量调试摘要（例如阶段/回合/事件数），避免日志信息过载但仍可判定状态推进。
+4. 决定是否将 `DebugLevel` 设为团队默认启动地图，并据此处理 `DefaultEngine.ini` 改动。
 
 ## Test Baseline
 

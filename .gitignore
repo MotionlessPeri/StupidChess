@@ -10,6 +10,7 @@ out/
 *.sln.docstates
 prompt.md
 unreal_mcp.log
+**/__pycache__/
 
 # Unreal Engine generated files
 clients/ue/**/.vs/
@@ -24,3 +25,4 @@ clients/ue/**/*.suo
 clients/ue/**/*.VC.db
 clients/ue/**/*.VC.opendb
 clients/ue/**/*.vsconfig
+clients/ue/**/*_HLOD*_Instancing.uasset
