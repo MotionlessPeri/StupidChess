@@ -64,6 +64,33 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 16. `add_blueprint_event_node` 已修复 override/lifecycle 事件创建路径：
    - 使用 `FKismetEditorUtilities::AddDefaultEventNode` 创建事件节点（而非直接构造 `UK2Node_Event`）。
    - `WidgetBlueprint` 的 `Event Construct` 等生命周期事件现在创建后可正常在运行时触发。
+17. UMG Stage 0+1 能力已同步：
+   - `create_umg_widget_blueprint` 参数口径对齐（支持 `widget_name` canonical，并兼容 legacy `name`；支持 `path`）。
+   - `set_text_block_binding` 参数口径对齐（`widget_name/binding_name` canonical，兼容 legacy 参数）。
+   - 新增 `get_widget_tree`，可读取 `WidgetBlueprint` 的根控件树（名称/类型/子节点/slot 类型/`is_variable`）。
+18. UMG Stage 2 能力已同步：
+   - 新增 `ensure_widget_root`：可确保 `WidgetBlueprint` 根控件存在，并支持 `replace_existing=true` 替换根控件。
+   - 新增 `add_widget_child`：可在任意 `UPanelWidget` 父节点下通用插入子控件（如 `VerticalBox` / `TextBlock` / `Button`）。
+   - 两个命令均会对目标 `WidgetBlueprint` 执行 compile + save，便于脚本多步构建后立即回读校验。
+19. UMG Stage 3 能力已同步：
+   - 新增 `set_canvas_slot_layout`：支持设置 `CanvasPanelSlot` 的 `position/size/alignment/anchors/auto_size/z_order`（命令返回读回值）。
+   - 新增 `set_uniform_grid_slot`：支持设置 `UniformGridSlot` 的 `row/column/horizontal_alignment/vertical_alignment`（命令返回读回值）。
+   - 已通过 probe smoke 验证“层级创建 + 布局设置 + `get_widget_tree` 回读”闭环。
+20. UMG Stage 4 能力已同步：
+   - 新增 `set_widget_common_properties`：支持设置 `UWidget` 层通用属性（`visibility`、`is_enabled`），并返回读回值（含 `is_variable`）。
+   - 新增 `set_text_block_properties`：支持设置 `TextBlock` 的 `text` 与 `color`（`[r,g,b,a]`），并返回读回值。
+   - 已通过 probe smoke 验证“层级创建 + 布局 + 属性设置 + `get_widget_tree` 回读”闭环。
+21. UMG Stage 5 能力已同步：
+   - 新增 `clear_widget_children`：清空指定面板（或 root）的直接子节点，并通过 `WidgetTree->RemoveWidget` 一并删除子树。
+   - 新增 `remove_widget_from_blueprint`：删除指定非 root widget 及其子树。
+   - 两个命令都会 compile + save，并返回移除计数与 root 读回树，便于脚本做重复执行校验。
+   - 已通过 probe smoke 验证“删除子树 + 清空并重建同一层级”后不会产生重复节点堆积。
+22. UMG 后续人体工学增强（probe 资产清理）已同步：
+   - 新增 `delete_widget_blueprints_by_prefix`：
+     - 按内容路径 + 资产名前缀筛选 `WidgetBlueprint`
+     - 支持 `dry_run=true` 先预览匹配结果
+     - `dry_run=false` 执行删除并返回成功/失败列表
+   - 已通过 smoke 验证“创建两份同前缀 probe -> dry-run 匹配 -> 删除 -> `get_widget_tree` 验证已删除”闭环。
 
 ## 能力边界（当前）
 
@@ -102,6 +129,26 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 10. 需要频繁重编插件导致反复手动关闭 UE:
    - 使用 `save_and_exit_editor` 让编辑器在 MCP 回包后延迟退出，再执行 `Build.bat` 冷编译。
    - 若仍无法退出，检查是否有调试器附加或弹窗阻塞（保存提示/确认框）。
+11. `get_widget_tree` / UMG 新命令调用报 Unknown:
+   - 先确认已从 fork 同步最新插件副本（`tools/sync_unreal_mcp.ps1`）。
+   - 然后关闭 UE（或用 `save_and_exit_editor`）、冷编译、重启编辑器，避免旧 DLL 仍在运行。
+12. UMG probe smoke 脚本超时（socket timeout）但 UE 日志里命令已成功回包:
+   - 先查看 `Saved/Logs/StupidChessUE.log` 中 `MCPServerRunnable: Sending response` 是否存在。
+   - 某些 UMG 命令在 compile/save 阶段会触发额外校验，耗时可能超过脚本默认 socket timeout（尤其首次执行）。
+13. `ensure_widget_root(replace_existing=true)` 后 UMG 编译出现 Widget GUID ensure:
+   - 新版命令已在“同类 root 仅改名”的场景下改为 rename 而非替换，避免 `WidgetBlueprintCompiler` 的 stale variable GUID ensure。
+   - 若仍出现，优先检查是否运行了旧插件 DLL（同步 + 冷编译 + 重启 UE）。
+14. `set_widget_common_properties` / `set_text_block_properties` 返回成功但 UI 显示没变化:
+   - 优先用 `get_widget_tree` 确认目标控件名字是否匹配（命令按 `widget_name` 精确查找）。
+   - 再确认当前 Widget 实例是否就是刚修改并 `Compile + Save` 的资产版本（PIE 中旧实例不会自动热更新）。
+15. 重复运行 UMG 构建脚本出现“Widget already exists in WidgetTree”:
+   - 优先使用 Stage 5 新命令：
+     - `clear_widget_children`（清空目标面板后重建）
+     - `remove_widget_from_blueprint`（先删除特定子树）
+   - 若仍报重名，先 `get_widget_tree` 回读确认残留节点位置，再决定是清 root 还是清局部 panel。
+16. `Content/UI` 下积累大量 `WBP_McpUmgProbe*` 测试资产:
+   - 使用 `delete_widget_blueprints_by_prefix(path=\"/Game/UI\", name_prefix=\"WBP_McpUmgProbe\", dry_run=true)` 先预览命中集合。
+   - 确认后再用 `dry_run=false` 批量清理。
 
 ## 本地直连自检（可选）
 

@@ -199,13 +199,67 @@
       - `save_dirty_assets` 可返回脏包保存前后计数。
       - `save_and_exit_editor` 可先回 MCP 响应，再延迟退出 UE Editor（避免回包被关机截断）。
     - `clients/ue/McpBlueprintWorkflow.md` 已补充“优先使用 MCP 保存并关闭 Editor 再冷编译插件”的工作流口径。
+59. UnrealMCP Route B 阶段 0+1 已同步并完成消费者侧 smoke：
+    - UMG 命令口径对齐：`create_umg_widget_blueprint`（`widget_name/path` + legacy 兼容）、`set_text_block_binding`（canonical + legacy 兼容）。
+    - 新增 `get_widget_tree`，可读取 `WidgetBlueprint` 控件树（根节点、子节点、slot 类型、`is_variable`）。
+    - 新增 smoke 脚本 `Python/scripts/umg_stage01_smoke.py`（位于 fork 仓库），在 `StupidChessUE` 中验证通过：
+      - 自动创建 probe widget（`/Game/UI/WBP_McpUmgProbe_*`）
+      - 回读 widget tree，确认根节点存在（`CanvasPanel_0`）。
+    - `clients/ue/McpBlueprintWorkflow.md` 已同步新增 UMG Stage0+1 能力与排障口径。
+60. UnrealMCP Route B 阶段 2 已同步并完成消费者侧 smoke：
+    - 新增 `ensure_widget_root`（根控件创建/复用/可选替换）与 `add_widget_child`（面板父节点下通用子控件插入）。
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_stage02_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - 创建 probe widget
+      - 将 root 替换为命名 `CanvasPanel`（`RootCanvas`）
+      - 在 root 下插入 `VerticalBox`（`DebugPanel`），再插入 `TextBlock` / `Button`
+      - `get_widget_tree` 回读层级与 slot 类型（`CanvasPanelSlot` / `VerticalBoxSlot`）符合预期。
+    - `clients/ue/McpBlueprintWorkflow.md` 已补充 Stage2 能力与超时排障口径。
+61. UnrealMCP Route B 阶段 3 已同步并完成消费者侧 smoke：
+    - 新增 `set_canvas_slot_layout`（`CanvasPanelSlot` 布局原语）与 `set_uniform_grid_slot`（`UniformGridSlot` 行列/对齐布局原语）。
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_stage03_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - root `CanvasPanel`
+      - `UniformGridPanel` + `VerticalBox` 作为 root 子节点
+      - `set_canvas_slot_layout` 读回 `position/size/z_order`
+      - `set_uniform_grid_slot` 读回 `row/column` 且 `slot_class=UniformGridSlot`
+      - `get_widget_tree` 回读层级与 slot 类型符合预期。
+    - 验证期间修复两项稳定性问题：
+      - `NormalizeWidgetClassKey` 不再误去掉 `UniformGridPanel` 的首字母 `U`
+      - `ensure_widget_root` 在同类 root 改名时使用 rename，避免 UMG `WidgetBlueprintCompiler` GUID ensure。
+62. UnrealMCP Route B 阶段 4 已同步并完成消费者侧 smoke：
+    - 新增 `set_widget_common_properties`（`UWidget` 通用属性 setter）：
+      - 支持 `visibility`、`is_enabled`
+      - 返回读回值（`visibility`、`is_enabled`、`is_variable`）
+    - 新增 `set_text_block_properties`（`TextBlock` 属性 setter）：
+      - 支持 `text`、`color=[r,g,b,a]`
+      - 返回读回值（`text`、`color`）
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_stage04_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - 创建 probe widget
+      - 自动构建 `CanvasPanel -> VerticalBox -> TextBlock/Button -> TextBlock` 层级
+      - 设置 canvas slot 布局、通用属性、文本与颜色
+      - `get_widget_tree` 回读层级成功，属性命令回包读回值与设置一致。
+63. UnrealMCP Route B 阶段 5 已同步并完成消费者侧 smoke：
+    - 新增 `clear_widget_children`（清空 panel 直接子节点并删除子树）与 `remove_widget_from_blueprint`（删除指定非 root widget 子树）。
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_stage05_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - 同一 probe widget 上先构建层级，再删除 `BtnAction` 子树（连带删除其子 `TxtButtonLabel`）
+      - 再通过 `clear_widget_children(RootCanvas)` 清理并重建
+      - 最终 `get_widget_tree` 回读层级稳定，无重复节点堆积。
+64. UnrealMCP UMG 后续人体工学增强（probe 资产清理）已同步并完成消费者侧 smoke：
+    - 新增 `delete_widget_blueprints_by_prefix`：
+      - 按内容路径 + 资产名前缀筛选 `WidgetBlueprint`
+      - 支持 `dry_run` 预览匹配
+      - 返回 `matched/deleted/failed` 列表，便于脚本与人工确认
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_bulk_cleanup_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - 创建两份同前缀 probe widget
+      - `dry_run=true` 命中两份资产
+      - `dry_run=false` 删除成功，`failed_delete_count=0`
+      - 之后 `get_widget_tree` 对两份资产均返回 not found。
 
 ## In Progress
 
 1. 在新脚本链路上做一次稳定回归（Join -> CommitReveal -> Move -> Resign）并记录期望日志断言。
 2. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
 3. 整理 `WBP_ClickProbe` 与 `DefaultEngine.ini` 的入库策略（长期调试资产 vs 本地开发偏好）。
-4. 回到 `unreal-mcp` Route B：恢复并继续 UMG Designer 自动化阶段 `0+1`（命令口径对齐 + `get_widget_tree`）。
+4. 规划 `unreal-mcp` Route B 后续人体工学增强（模板化构建 helper / 批量布局 helper）。
 
 ## Next Steps
 
@@ -214,6 +268,8 @@
 3. 为 `Snapshot/EventDelta` 增加轻量调试摘要（例如阶段/回合/事件数），避免日志信息过载但仍可判定状态推进。
 4. 决定是否将 `DebugLevel` 设为团队默认启动地图，并据此处理 `DefaultEngine.ini` 改动。
 5. 在 `unreal-mcp` 中继续补齐 UMG Designer 自动化能力，并用 `WBP_McpUmgProbe` 做阶段性 smoke。
+6. 评估是否将 probe 清理进一步扩展为更通用的资产清理能力（不仅限 `WidgetBlueprint`）。
+7. 为 Route B smoke 脚本统一超时/重试策略，避免 UMG compile/save 阶段耗时导致误报超时。
 
 ## Test Baseline
 
