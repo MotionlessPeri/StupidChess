@@ -190,6 +190,9 @@
     - 在 fork `MotionlessPeri/unreal-mcp` 中将事件节点创建由手工 `NewObject<UK2Node_Event>` 改为 `FKismetEditorUtilities::AddDefaultEventNode`。
     - 修复 `WidgetBlueprint` 中 `Event Construct` 等 override/lifecycle 事件“节点可见但运行时不触发”的问题。
     - 已通过 `tools/sync_unreal_mcp.ps1` 同步到本仓插件副本，并在 `StupidChessUEEditor` 冷编译下验证通过。
+57. `Construct` 入口运行时探针：
+    - `tools/wire_local_match_widget_graph.py` 在 `--wire-construct` 重建的 `Event Construct` 链首节点插入 `PrintString("[Construct][Enter]")`。
+    - 用于快速验证 MCP 创建的 `Event Construct` 是否在 PIE 运行时实际触发。
 
 ## In Progress
 

@@ -388,6 +388,16 @@ def bind_multicast_delegate(
 
 def wire_construct_delegate_bindings() -> None:
     construct_event = add_event("Construct", -3600, -2200)
+    construct_enter_log = add_call(
+        target="UKismetSystemLibrary",
+        function_name="PrintString",
+        node_x=-3360,
+        node_y=-2200,
+        params={
+            "InString": "[Construct][Enter]",
+            "Duration": 2.0,
+        },
+    )
     getter_subsystem = add_get_subsystem(-3200, -2200)
 
     delegate_logs = [
@@ -399,7 +409,8 @@ def wire_construct_delegate_bindings() -> None:
         ("OnGameOverParsed", "[Callback][GameOver]", "GetCachedGameOverDebugString"),
     ]
 
-    previous_exec_node = construct_event
+    connect_exec(construct_event, construct_enter_log)
+    previous_exec_node = construct_enter_log
     for index, (delegate_name, log_text, summary_function_name) in enumerate(delegate_logs):
         base_y = -2200 + index * 280
         assign_node, custom_event_node = bind_multicast_delegate(
