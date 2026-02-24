@@ -253,13 +253,19 @@
       - `dry_run=true` 命中两份资产
       - `dry_run=false` 删除成功，`failed_delete_count=0`
       - 之后 `get_widget_tree` 对两份资产均返回 not found。
+65. UnrealMCP UMG 后续人体工学增强（批量 Canvas 布局）已同步并完成消费者侧 smoke：
+    - 新增 `set_canvas_slot_layout_batch`：支持在单次命令中批量设置多个 `CanvasPanelSlot` 的布局属性（与 `set_canvas_slot_layout` 同字段集）。
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_canvas_batch_layout_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - 创建 probe widget 并添加两个 `CanvasPanel` 子节点（`PanelA` / `PanelB`）
+      - 单次命令批量设置两者 `position/size/z_order`
+      - 回包逐项读回布局值正确，`get_widget_tree` 确认二者均位于 `CanvasPanelSlot`。
 
 ## In Progress
 
 1. 在新脚本链路上做一次稳定回归（Join -> CommitReveal -> Move -> Resign）并记录期望日志断言。
 2. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
 3. 整理 `WBP_ClickProbe` 与 `DefaultEngine.ini` 的入库策略（长期调试资产 vs 本地开发偏好）。
-4. 规划 `unreal-mcp` Route B 后续人体工学增强（模板化构建 helper / 批量布局 helper）。
+4. 规划 `unreal-mcp` Route B 后续人体工学增强（模板化构建 helper / 批量属性 helper）。
 
 ## Next Steps
 
@@ -270,6 +276,7 @@
 5. 在 `unreal-mcp` 中继续补齐 UMG Designer 自动化能力，并用 `WBP_McpUmgProbe` 做阶段性 smoke。
 6. 评估是否将 probe 清理进一步扩展为更通用的资产清理能力（不仅限 `WidgetBlueprint`）。
 7. 为 Route B smoke 脚本统一超时/重试策略，避免 UMG compile/save 阶段耗时导致误报超时。
+8. 评估是否补 `set_widget_common_properties_batch`，用于状态面板类 UI 的大批量显隐/使能切换。
 
 ## Test Baseline
 

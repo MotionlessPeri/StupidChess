@@ -91,6 +91,12 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
      - 支持 `dry_run=true` 先预览匹配结果
      - `dry_run=false` 执行删除并返回成功/失败列表
    - 已通过 smoke 验证“创建两份同前缀 probe -> dry-run 匹配 -> 删除 -> `get_widget_tree` 验证已删除”闭环。
+23. UMG 后续人体工学增强（批量 Canvas 布局）已同步：
+   - 新增 `set_canvas_slot_layout_batch`：
+     - `items[]` 中每项用 `widget_name` 指定目标控件
+     - 每项支持与 `set_canvas_slot_layout` 相同的可选字段（`position/size/alignment/anchors/auto_size/z_order`）
+     - 一次命令完成多控件布局更新，并仅 compile + save 一次
+   - 已通过 smoke 验证“单次命令批量设置两个 Canvas 子控件布局，并返回逐项读回值”闭环。
 
 ## 能力边界（当前）
 
@@ -149,6 +155,9 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 16. `Content/UI` 下积累大量 `WBP_McpUmgProbe*` 测试资产:
    - 使用 `delete_widget_blueprints_by_prefix(path=\"/Game/UI\", name_prefix=\"WBP_McpUmgProbe\", dry_run=true)` 先预览命中集合。
    - 确认后再用 `dry_run=false` 批量清理。
+17. 批量布局命令 `set_canvas_slot_layout_batch` 失败:
+   - 先确认 `items` 为对象数组，且每项包含 `widget_name`。
+   - 命令会在同一次请求内校验所有项；任一项控件不存在或不在 `CanvasPanelSlot` 中都会整体失败。
 
 ## 本地直连自检（可选）
 
