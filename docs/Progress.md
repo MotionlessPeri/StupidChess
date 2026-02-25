@@ -259,6 +259,18 @@
       - 创建 probe widget 并添加两个 `CanvasPanel` 子节点（`PanelA` / `PanelB`）
       - 单次命令批量设置两者 `position/size/z_order`
       - 回包逐项读回布局值正确，`get_widget_tree` 确认二者均位于 `CanvasPanelSlot`。
+66. UnrealMCP UMG 后续人体工学增强（批量通用属性）已同步并完成消费者侧 smoke：
+    - 新增 `set_widget_common_properties_batch`：支持在单次命令中批量设置多个控件的 `visibility` / `is_enabled`（与单项命令相同语义）。
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_widget_common_batch_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - 创建包含 `TextBlock` / `Button` / `Border` 的 probe widget
+      - 单次命令批量设置显隐/使能（含 `SelfHitTestInvisible`）
+      - 回包逐项读回值正确，覆盖混合控件类型场景。
+67. UnrealMCP UMG 后续人体工学增强（批量 UniformGrid 布局）已同步并完成消费者侧 smoke：
+    - 新增 `set_uniform_grid_slot_batch`：支持在单次命令中批量设置多个 `UniformGridSlot` 的 `row/column/horizontal_alignment/vertical_alignment`（与单项命令同语义）。
+    - 新增 fork 侧 smoke 脚本 `Python/scripts/umg_uniform_grid_batch_smoke.py`，在 `StupidChessUE` 中验证通过：
+      - 创建包含 `UniformGridPanel` 与 4 个 cell 的 probe widget
+      - 单次命令批量设置 4 个 cell 的行列/对齐
+      - 回包逐项读回行列值正确，`get_widget_tree` 确认 cell 均位于 `UniformGridSlot`。
 
 ## In Progress
 
@@ -276,7 +288,7 @@
 5. 在 `unreal-mcp` 中继续补齐 UMG Designer 自动化能力，并用 `WBP_McpUmgProbe` 做阶段性 smoke。
 6. 评估是否将 probe 清理进一步扩展为更通用的资产清理能力（不仅限 `WidgetBlueprint`）。
 7. 为 Route B smoke 脚本统一超时/重试策略，避免 UMG compile/save 阶段耗时导致误报超时。
-8. 评估是否补 `set_widget_common_properties_batch`，用于状态面板类 UI 的大批量显隐/使能切换。
+8. 评估是否补 `set_text_block_properties_batch`，用于状态栏/调试面板文本批量刷新能力。
 
 ## Test Baseline
 

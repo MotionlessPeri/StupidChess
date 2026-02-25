@@ -60,6 +60,17 @@ private:
     TSharedPtr<FJsonObject> HandleAddWidgetChild(const TSharedPtr<FJsonObject>& Params);
 
     /**
+     * Batch-add generic widgets as children of panel widgets in the widget tree
+     * @param Params - Must include:
+     *                "blueprint_name" - Name/path of the target Widget Blueprint
+     *                "items" - array of objects; each object must include:
+     *                          "parent_widget_name" (optional, defaults to root),
+     *                          "widget_class", "widget_name"
+     * @return JSON response with per-item child and slot details
+     */
+    TSharedPtr<FJsonObject> HandleAddWidgetChildBatch(const TSharedPtr<FJsonObject>& Params);
+
+    /**
      * Set layout properties for a widget in a CanvasPanelSlot
      * @param Params - Must include:
      *                "blueprint_name", "widget_name"
@@ -88,6 +99,16 @@ private:
     TSharedPtr<FJsonObject> HandleSetUniformGridSlot(const TSharedPtr<FJsonObject>& Params);
 
     /**
+     * Batch-set layout properties for multiple widgets hosted in UniformGridSlot
+     * @param Params - Must include:
+     *                "blueprint_name"
+     *                "items" - array of objects; each object must include "widget_name"
+     *                          and may include same optional fields as set_uniform_grid_slot
+     * @return JSON response with per-item readback slot values
+     */
+    TSharedPtr<FJsonObject> HandleSetUniformGridSlotBatch(const TSharedPtr<FJsonObject>& Params);
+
+    /**
      * Set common UWidget properties useful for debug UI automation
      * @param Params - Must include "blueprint_name", "widget_name"
      *                Optional: "visibility", "is_enabled"
@@ -96,12 +117,32 @@ private:
     TSharedPtr<FJsonObject> HandleSetWidgetCommonProperties(const TSharedPtr<FJsonObject>& Params);
 
     /**
+     * Batch-set common UWidget properties useful for debug UI automation
+     * @param Params - Must include:
+     *                "blueprint_name"
+     *                "items" - array of objects; each must include "widget_name"
+     *                          and may include "visibility", "is_enabled"
+     * @return JSON response with per-item readback values
+     */
+    TSharedPtr<FJsonObject> HandleSetWidgetCommonPropertiesBatch(const TSharedPtr<FJsonObject>& Params);
+
+    /**
      * Set common TextBlock properties useful for debug UI automation
      * @param Params - Must include "blueprint_name", "widget_name"
      *                Optional: "text", "color"
      * @return JSON response with readback values
      */
     TSharedPtr<FJsonObject> HandleSetTextBlockProperties(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Batch-set common TextBlock properties useful for debug UI automation
+     * @param Params - Must include:
+     *                "blueprint_name"
+     *                "items" - array of objects; each must include "widget_name"
+     *                          and may include "text", "color"
+     * @return JSON response with per-item readback values
+     */
+    TSharedPtr<FJsonObject> HandleSetTextBlockPropertiesBatch(const TSharedPtr<FJsonObject>& Params);
 
     /**
      * Remove all direct children from a panel widget (optionally root) and their subtrees

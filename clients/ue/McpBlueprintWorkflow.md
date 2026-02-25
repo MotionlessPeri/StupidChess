@@ -97,6 +97,18 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
      - 每项支持与 `set_canvas_slot_layout` 相同的可选字段（`position/size/alignment/anchors/auto_size/z_order`）
      - 一次命令完成多控件布局更新，并仅 compile + save 一次
    - 已通过 smoke 验证“单次命令批量设置两个 Canvas 子控件布局，并返回逐项读回值”闭环。
+24. UMG 后续人体工学增强（批量通用属性）已同步：
+   - 新增 `set_widget_common_properties_batch`：
+     - `items[]` 中每项用 `widget_name` 指定目标控件
+     - 每项支持 `visibility`、`is_enabled`
+     - 一次命令完成多控件更新，并仅 compile + save 一次
+   - 已通过 smoke 验证对 `TextBlock` / `Button` / `Border` 混合批量设置显隐/使能，并返回逐项读回值。
+25. UMG 后续人体工学增强（批量 UniformGrid 布局）已同步：
+   - 新增 `set_uniform_grid_slot_batch`：
+     - `items[]` 中每项用 `widget_name` 指定目标控件
+     - 每项支持 `row/column/horizontal_alignment/vertical_alignment`
+     - 一次命令完成多控件更新，并仅 compile + save 一次
+   - 已通过 smoke 验证对 `UniformGridPanel` 中 4 个 cell 批量设置行列/对齐，并返回逐项读回值。
 
 ## 能力边界（当前）
 
@@ -158,6 +170,12 @@ powershell -ExecutionPolicy Bypass -File tools\sync_unreal_mcp.ps1 -ForkRepoRoot
 17. 批量布局命令 `set_canvas_slot_layout_batch` 失败:
    - 先确认 `items` 为对象数组，且每项包含 `widget_name`。
    - 命令会在同一次请求内校验所有项；任一项控件不存在或不在 `CanvasPanelSlot` 中都会整体失败。
+18. 批量通用属性命令 `set_widget_common_properties_batch` 失败:
+   - 先确认每个 item 都包含 `widget_name`，且 `visibility` 字符串取值合法（与单项命令相同）。
+   - 命令按“全批次失败”处理：任一项无效会中断整个请求，不会做部分提交。
+19. 批量 UniformGrid 命令 `set_uniform_grid_slot_batch` 失败:
+   - 先确认目标控件确实位于 `UniformGridPanel` 中（`slot_class=UniformGridSlot`）。
+   - 对齐字符串取值与单项命令一致（`Fill/Left/Center/Right`、`Fill/Top/Center/Bottom`），任一 item 无效会整体失败。
 
 ## 本地直连自检（可选）
 

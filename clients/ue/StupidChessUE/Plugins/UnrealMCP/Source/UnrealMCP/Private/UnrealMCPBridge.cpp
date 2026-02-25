@@ -286,14 +286,18 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                      CommandType == TEXT("get_widget_tree") ||
                      CommandType == TEXT("ensure_widget_root") ||
                      CommandType == TEXT("add_widget_child") ||
+                     CommandType == TEXT("add_widget_child_batch") ||
                      CommandType == TEXT("set_canvas_slot_layout") ||
                      CommandType == TEXT("set_canvas_slot_layout_batch") ||
                      CommandType == TEXT("set_uniform_grid_slot") ||
+                     CommandType == TEXT("set_uniform_grid_slot_batch") ||
                      CommandType == TEXT("clear_widget_children") ||
                      CommandType == TEXT("remove_widget_from_blueprint") ||
                      CommandType == TEXT("delete_widget_blueprints_by_prefix") ||
                      CommandType == TEXT("set_widget_common_properties") ||
+                     CommandType == TEXT("set_widget_common_properties_batch") ||
                      CommandType == TEXT("set_text_block_properties") ||
+                     CommandType == TEXT("set_text_block_properties_batch") ||
                      CommandType == TEXT("add_text_block_to_widget") ||
                      CommandType == TEXT("add_button_to_widget") ||
                      CommandType == TEXT("bind_widget_event") ||
