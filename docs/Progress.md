@@ -4,6 +4,7 @@
 
 1. 2026-02-19
 2. 2026-02-23
+3. 2026-02-25
 
 ## Current Milestone
 
@@ -271,6 +272,27 @@
       - 创建包含 `UniformGridPanel` 与 4 个 cell 的 probe widget
       - 单次命令批量设置 4 个 cell 的行列/对齐
       - 回包逐项读回行列值正确，`get_widget_tree` 确认 cell 均位于 `UniformGridSlot`。
+68. UE Battle Prototype（首版 C++ 交互棋盘）已落地：
+    - `StupidChessCoreBridge` 新增 `UStupidChessBattlePrototypeWidget`（纯 C++ 动态构建 `9x10` 可点击棋盘 + 侧栏按钮）。
+    - 原型按钮闭环：`Bootstrap Battle / Pull Both / Pass Current / Black Resign`。
+    - 原型棋盘交互闭环：选中当前回合棋子 -> 点击目标格 -> 提交 `SubmitMove` -> 双侧增量拉取 -> 基于 `Snapshot` 刷新格子显示。
+    - 新增 `UStupidChessBattlePrototypeBlueprintLibrary::ShowBattlePrototypeWidget`，便于在 `Level Blueprint` 中一键创建并加入视口。
+    - `StupidChessUEEditor` 冷编译验证通过（UE 5.7）。
+69. Battle Prototype `Bootstrap Battle` 顺序修复：
+    - 修复原型按钮初始化链路顺序错误（原为 `Red Commit -> Red Reveal -> Black Commit -> Black Reveal`）。
+    - 调整为 `Red Commit -> Black Commit -> Red Reveal -> Black Reveal`，避免红方在 `SetupCommit` 阶段提前 `Reveal` 被服务端拒绝。
+70. Battle Prototype 棋盘格调试信息增强：
+    - 棋盘格标签改为两行显示：`Side+PieceId` 与 `VisibleRole + Flags`（`Rv`/`Fr`）。
+    - 便于在原型阶段直接观察“可见职业”“是否已公开”“是否冻结”等玩法状态。
+71. Battle Prototype 棋盘格角色显示改为汉字：
+    - 棋盘格第二行由 `VisibleRole` 数字改为汉字角色（如 `車 / 馬 / 炮 / 兵 / 卒 / 帥 / 將`）。
+    - 基于 `PieceId` 推导实际职业（调试映射），当“可见职业 != 实际职业”时显示为 `<可见>/<实际>`，便于观察盲摆差异。
+72. Battle Prototype 新增 `Bootstrap Scrambled`：
+    - 在合法初始摆位集合内对每方棋子位置做随机映射（不破坏 Reveal 输入合法性）。
+    - 用于更高概率触发“可见职业 != 实际职业”场景，便于验证玩法核心差异。
+73. Battle Prototype 棋盘格角色标签口径统一：
+    - 原型棋盘格第二行固定显示 `<可见职业汉字>/<实际职业汉字> <Flags>`，不再在“相同职业”时折叠实际职业。
+    - 便于红黑双方统一对照“可见/实际”信息，减少原型测试时的误读。
 
 ## In Progress
 
@@ -278,6 +300,7 @@
 2. 冷启动验证 `bind_blueprint_multicast_delegate`（关闭 UE 后重编译插件，再执行脚本回归）。
 3. 整理 `WBP_ClickProbe` 与 `DefaultEngine.ini` 的入库策略（长期调试资产 vs 本地开发偏好）。
 4. 规划 `unreal-mcp` Route B 后续人体工学增强（模板化构建 helper / 批量属性 helper）。
+5. 将 Battle Prototype 接入一个正式调试入口（`Level Blueprint` 或固定 `WBP_ChessBoardDebug` 资产），减少手动调用步骤。
 
 ## Next Steps
 
@@ -289,6 +312,7 @@
 6. 评估是否将 probe 清理进一步扩展为更通用的资产清理能力（不仅限 `WidgetBlueprint`）。
 7. 为 Route B smoke 脚本统一超时/重试策略，避免 UMG compile/save 阶段耗时导致误报超时。
 8. 评估是否补 `set_text_block_properties_batch`，用于状态栏/调试面板文本批量刷新能力。
+9. 为 Battle Prototype 增加“进入战斗阶段后一键初始同步 + 当前回合提示 + 终局重开”体验优化。
 
 ## Test Baseline
 

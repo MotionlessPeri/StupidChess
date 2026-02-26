@@ -62,6 +62,43 @@ UE 客户端实现目录。
 
 最小蓝图接线模板见：`clients/ue/BlueprintQuickStart.md`。
 
+## Battle Prototype (C++ Runtime Widget)
+
+`StupidChessCoreBridge` 现提供一个原型阶段可直接使用的运行时棋盘 Widget（纯 C++ 动态构建，不依赖手工搭 90 个格子）：
+
+1. `UStupidChessBattlePrototypeWidget`
+   - 运行时动态生成 `9x10` 棋盘格（可点击）
+   - 侧栏按钮：`Bootstrap Battle / Pull Both / Pass Current / Black Resign`
+   - 基于 `UStupidChessLocalMatchSubsystem` 的本地权威链路更新 UI（`Snapshot / EventDelta / Ack / GameOver`）
+   - 支持“先选起点格，再点终点格”提交 `SubmitMove`
+2. `UStupidChessBattlePrototypeBlueprintLibrary::ShowBattlePrototypeWidget`
+   - 蓝图一键创建并 `AddToViewport`
+   - 适合在 `Level Blueprint -> BeginPlay` 直接调用
+
+### 最小使用方式（Prototype）
+
+1. 在 `Level Blueprint` 的 `BeginPlay` 调用：
+   - `ShowBattlePrototypeWidget(WorldContext=self)`
+2. 进入 PIE 后点击 `Bootstrap Battle`
+   - 自动执行 `ResetLocalServer -> Join(red/black) -> Commit/Reveal(red/black) -> Pull`
+   - 进入战斗阶段后即可点击棋盘格尝试走子
+3. 若要观察盲摆差异，点击 `Bootstrap Scrambled`
+   - 仍使用合法初始摆位集合，但将棋子与位置随机映射（每方独立）
+   - 更容易出现“可见职业 != 实际职业”的情况
+4. 点击规则：
+   - 第一次点击：选择当前回合方棋子
+   - 第二次点击：作为目标格提交 `Move`
+   - 点击已选中格：取消选择
+5. 棋盘格文本（当前调试样式）：
+   - 第一行：`R/B + PieceId`
+   - 第二行：`<可见职业汉字>/<实际职业汉字> <Flags>`（所有棋子都固定显示 `可见/实际`）
+   - `Flags`：`公` 表示该子已公开实际职业，`冻` 表示冻结，`-` 表示无标记
+
+说明：
+
+1. 当前是 Battle Prototype，目标是验证交互闭环与状态刷新，不是最终美术/完整玩法 UI。
+2. 走子合法性仍由服务端权威裁定；非法操作请看侧栏 `Ack/Error` 文本。
+
 ## Automation Test
 
 1. `StupidChess.UE.CoreBridge.LocalFlow`：覆盖本地链路 `Join -> Commit/Reveal -> Move -> Resign -> AckError`，并验证 `TryParse* + ParsedCache` 结构化解析接口。
