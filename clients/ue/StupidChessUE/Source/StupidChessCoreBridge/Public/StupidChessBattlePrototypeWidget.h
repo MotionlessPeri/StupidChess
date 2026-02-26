@@ -15,6 +15,12 @@ class UVerticalBox;
 
 class UStupidChessBattlePrototypeWidget;
 
+struct FStupidChessSetupPlacementHistoryEntry
+{
+    EStupidChessSide Side = EStupidChessSide::Red;
+    FStupidChessSetupPlacement Placement{};
+};
+
 UCLASS()
 class STUPIDCHESSCOREBRIDGE_API UStupidChessBoardCellClickProxy : public UObject
 {
@@ -51,6 +57,15 @@ public:
     void BootstrapScrambledBattlePrototypeMatch();
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
+    void BootstrapSetupPrototypeMatch();
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
+    void SubmitSetupPrototypeReveal();
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
+    void UndoSetupPrototypePlacement();
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
     void PullBothSides();
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
@@ -61,6 +76,15 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
     void ResetPrototypeStateOnly();
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
+    void ShowRedPlayerView();
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
+    void ShowBlackPlayerView();
+
+    UFUNCTION(BlueprintCallable, Category = "StupidChess|Prototype")
+    void ToggleStrictPlayerView();
 
     UFUNCTION(BlueprintPure, Category = "StupidChess|Prototype")
     bool HasLiveSnapshot() const
@@ -106,6 +130,24 @@ private:
     void HandleBootstrapScrambledButtonClicked();
 
     UFUNCTION()
+    void HandleBootstrapSetupButtonClicked();
+
+    UFUNCTION()
+    void HandleSubmitSetupButtonClicked();
+
+    UFUNCTION()
+    void HandleUndoSetupButtonClicked();
+
+    UFUNCTION()
+    void HandleShowRedViewButtonClicked();
+
+    UFUNCTION()
+    void HandleShowBlackViewButtonClicked();
+
+    UFUNCTION()
+    void HandleToggleStrictViewButtonClicked();
+
+    UFUNCTION()
     void HandlePassButtonClicked();
 
     UFUNCTION()
@@ -137,11 +179,24 @@ private:
     void RefreshAllUi();
     void RefreshBoardCells();
     void RefreshStatusTexts();
+    void ApplyDisplayedViewerSnapshotIfAvailable();
     void ClearSelection();
+    void ResetSetupPrototypeState();
+    void RefreshSetupSelectionStatus();
+    bool HandleSetupBoardCellClicked(int32 X, int32 Y);
+    bool RemoveLastSetupPlacementForSide(EStupidChessSide Side, const FStupidChessSetupPlacement* ExpectedPlacement = nullptr);
+    bool TryGetSetupActiveSide(EStupidChessSide& OutSide) const;
+    bool TryFindSetupPreviewPieceAt(int32 X, int32 Y, FStupidChessSetupPlacement& OutPlacement, int32& OutSide) const;
+    bool IsValidSetupSlot(EStupidChessSide Side, int32 X, int32 Y) const;
+    bool IsSetupCellOccupied(EStupidChessSide Side, int32 X, int32 Y) const;
+    int32 GetSetupSlotVisibleRole(EStupidChessSide Side, int32 X, int32 Y) const;
+    FString MakeSetupCellLabelText(const FStupidChessSetupPlacement& Placement, int32 Side, bool bSelected) const;
+    void CacheSurfaceRolesFromPlacements(EStupidChessSide Side, const TArray<FStupidChessSetupPlacement>& Placements);
+    int32 GetCachedSurfaceRoleTypeForPiece(int32 PieceId, int32 Side) const;
     bool TrySubmitMoveFromSelection(int32 ToX, int32 ToY);
     UStupidChessLocalMatchSubsystem* GetLocalSubsystem();
     const FStupidChessPieceSnapshot* FindLivePieceAt(int32 X, int32 Y) const;
-    static FString MakeCellLabelText(const FStupidChessPieceSnapshot* Piece, bool bSelected);
+    FString MakeCellLabelText(const FStupidChessPieceSnapshot* Piece, bool bSelected) const;
     static FString PhaseToDebugLabel(int32 Phase);
     static FString SideToDebugLabel(int32 Side);
     bool TryGetCurrentTurnSide(EStupidChessSide& OutSide) const;
@@ -193,6 +248,24 @@ private:
     TObjectPtr<UButton> BtnPull = nullptr;
 
     UPROPERTY(Transient)
+    TObjectPtr<UButton> BtnBootstrapSetup = nullptr;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> BtnSubmitSetup = nullptr;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> BtnUndoSetup = nullptr;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> BtnShowRedView = nullptr;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> BtnShowBlackView = nullptr;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UButton> BtnToggleStrictView = nullptr;
+
+    UPROPERTY(Transient)
     TObjectPtr<UButton> BtnPass = nullptr;
 
     UPROPERTY(Transient)
@@ -213,10 +286,25 @@ private:
     bool bWidgetTreeBuilt = false;
     bool bUiButtonsBound = false;
     bool bSubsystemDelegatesBound = false;
+    bool bSetupPrototypeActive = false;
+    bool bSetupPrototypeReadyToSubmit = false;
     bool bHasLiveSnapshot = false;
+    bool bHasSnapshotForViewer[2] = {false, false};
+    bool bStrictPlayerView = false;
     bool bHasSelection = false;
     FIntPoint SelectedBoardCell = FIntPoint(-1, -1);
+    EStupidChessSide DisplayViewerSide = EStupidChessSide::Red;
+    EStupidChessSide SetupActiveSide = EStupidChessSide::Red;
+    int32 SetupNextPlacementIndexRed = 0;
+    int32 SetupNextPlacementIndexBlack = 0;
+    TArray<FStupidChessSetupPlacement> SetupStandardPlacementsRed;
+    TArray<FStupidChessSetupPlacement> SetupStandardPlacementsBlack;
+    TArray<FStupidChessSetupPlacement> SetupPendingPlacementsRed;
+    TArray<FStupidChessSetupPlacement> SetupPendingPlacementsBlack;
+    TArray<FStupidChessSetupPlacementHistoryEntry> SetupPlacementHistory;
+    TMap<int32, int32> PieceSurfaceRoleTypeByPieceId;
     FStupidChessSnapshotView LiveSnapshot{};
+    FStupidChessSnapshotView SnapshotByViewer[2]{};
     FString PrototypeStatusText = TEXT("Idle");
     FString SelectionStatusText = TEXT("No selection");
     FString EventDeltaStatusText = TEXT("[EventDelta] <none>");

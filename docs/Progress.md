@@ -293,6 +293,28 @@
 73. Battle Prototype 棋盘格角色标签口径统一：
     - 原型棋盘格第二行固定显示 `<可见职业汉字>/<实际职业汉字> <Flags>`，不再在“相同职业”时折叠实际职业。
     - 便于红黑双方统一对照“可见/实际”信息，减少原型测试时的误读。
+74. Battle Prototype 增加最小 Setup Prototype（手动摆子 -> Commit/Reveal -> Battle）：
+    - 在 `UStupidChessBattlePrototypeWidget` 新增 `Bootstrap Setup` / `Submit Setup` 按钮与 Setup 状态机。
+    - Setup 模式下棋盘点击改为“按顺序摆子”：按当前阵营待摆棋子，点击合法初始位完成摆放；红方摆满后自动切黑方。
+    - 红黑双方都摆满后 `Submit Setup` 执行 `Commit/Reveal` 并进入 Battle，复用原有本地权威链路与 UI 刷新。
+    - Setup 模式棋盘格支持预览 `表面职业/实际职业`（按位置与 `PieceId` 推导），便于原型阶段观察玩法核心差异。
+75. Setup Prototype 可用性增强（撤销上一步摆子）：
+    - `UStupidChessBattlePrototypeWidget` 新增 `Undo Setup` 按钮与 `UndoSetupPrototypePlacement` 接口。
+    - 通过摆子历史栈记录最近一次摆放（阵营 + `PieceId` + 坐标），支持跨红黑双方按真实顺序回退。
+    - `Submit Setup` / `Undo Setup` 按钮启用状态与 Setup 进度联动（未摆满不可提交、无历史不可撤销）。
+76. Prototype A（信息不对等验证）最小版已接入 Battle Prototype：
+    - 单棋盘模式下新增 `Show Red View / Show Black View`，按 `Snapshot.ViewerSide` 缓存并切换红黑视角快照。
+    - 新增 `Toggle Strict View`：
+      - 关闭时为开发调试叠加（始终显示 `可见/实际`）
+      - 开启时为严格玩家视图（对手未公开棋子的实际职业显示为 `？`）
+    - 通过同一局下切换红黑视角，可先独立验证“信息不对等展示口径”，再进入网络原型。
+77. Battle Prototype 侧栏排版调整（按钮可达性修复）：
+    - 侧栏 `VerticalBox` 中将所有操作按钮移动到状态文本区域之前，避免长状态文本将按钮挤出可视区域。
+    - 修复 Prototype A/Setup 原型按钮增多后在常见窗口高度下“看不到按钮、无法点击”的问题。
+78. Prototype A 棋盘首项显示口径修正（`VisibleRole` -> 表面职业缓存）：
+    - 原型棋盘第二行首项改为“表面职业（本地缓存）”，不再直接使用 `Snapshot.VisibleRole`，避免在自己视角下被服务端投影成接近实际职业后造成误读。
+    - 在 `Bootstrap Battle/Scrambled` 与 `Submit Setup` 两条 `Reveal` 路径缓存 `PieceId -> 表面职业` 映射（由提交摆位位置推导）。
+    - `Toggle Strict View` 仅影响“实际职业是否显示为 `？`”，不影响表面职业显示。
 
 ## In Progress
 

@@ -68,9 +68,10 @@ UE 客户端实现目录。
 
 1. `UStupidChessBattlePrototypeWidget`
    - 运行时动态生成 `9x10` 棋盘格（可点击）
-   - 侧栏按钮：`Bootstrap Battle / Pull Both / Pass Current / Black Resign`
+   - 侧栏按钮：`Bootstrap Battle / Bootstrap Scrambled / Bootstrap Setup / Submit Setup / Undo Setup / Show Red View / Show Black View / Toggle Strict View / Pull Both / Pass Current / Black Resign`
    - 基于 `UStupidChessLocalMatchSubsystem` 的本地权威链路更新 UI（`Snapshot / EventDelta / Ack / GameOver`）
    - 支持“先选起点格，再点终点格”提交 `SubmitMove`
+   - 支持最小 Setup Prototype：按顺序摆放红/黑双方 16 子后执行 `Commit/Reveal` 进入 Battle
 2. `UStupidChessBattlePrototypeBlueprintLibrary::ShowBattlePrototypeWidget`
    - 蓝图一键创建并 `AddToViewport`
    - 适合在 `Level Blueprint -> BeginPlay` 直接调用
@@ -86,13 +87,25 @@ UE 客户端实现目录。
    - 仍使用合法初始摆位集合，但将棋子与位置随机映射（每方独立）
    - 更容易出现“可见职业 != 实际职业”的情况
 4. 点击规则：
+   - `Bootstrap Setup` 后进入 Setup Prototype：
+     - 右侧 `Selection` 文本显示“当前待摆棋子（阵营/序号/PieceId/实际职业）”
+     - 点击当前阵营合法初始位完成摆放（按顺序摆满 16 子后自动切到另一方）
+     - 红黑都摆满后，`Submit Setup` 按钮变为可点，执行 `Commit/Reveal` 并进入 Battle
+     - `Undo Setup` 可撤销最近一次摆子（跨红黑双方按实际摆放顺序回退）
+   - Setup 模式棋盘格第二行显示 `表面(位置)/实际(棋子)` 职业，用于直接观察玩法差异
    - 第一次点击：选择当前回合方棋子
    - 第二次点击：作为目标格提交 `Move`
    - 点击已选中格：取消选择
 5. 棋盘格文本（当前调试样式）：
    - 第一行：`R/B + PieceId`
-   - 第二行：`<可见职业汉字>/<实际职业汉字> <Flags>`（所有棋子都固定显示 `可见/实际`）
+   - 第二行：`<表面职业汉字>/<实际职业汉字> <Flags>`（所有棋子都固定显示 `表/实`）
+   - `表面职业` 为原型本地缓存（基于提交的摆位位置推导），不直接复用 `Snapshot.VisibleRole`
    - `Flags`：`公` 表示该子已公开实际职业，`冻` 表示冻结，`-` 表示无标记
+6. Prototype A（信息不对等验证，单棋盘切换视角）：
+   - `Show Red View / Show Black View`：切换当前棋盘显示所使用的 viewer snapshot（红/黑玩家视角）
+   - `Toggle Strict View`：
+     - `Off`（默认）：开发调试叠加视图，始终显示 `表/实`
+     - `On`：严格玩家视图；对手未公开棋子的实际职业显示为 `？`（自己的棋子仍显示实际职业，表面职业仍显示）
 
 说明：
 

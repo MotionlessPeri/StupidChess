@@ -142,6 +142,130 @@ void UStupidChessBattlePrototypeWidget::BootstrapScrambledBattlePrototypeMatch()
     BootstrapBattleInternal(true);
 }
 
+void UStupidChessBattlePrototypeWidget::BootstrapSetupPrototypeMatch()
+{
+    UStupidChessLocalMatchSubsystem* Subsystem = GetLocalSubsystem();
+    if (Subsystem == nullptr)
+    {
+        SetPrototypeStatus(TEXT("[SetupBootstrap] Local subsystem unavailable"));
+        return;
+    }
+
+    ResetPrototypeStateOnly();
+    ResetSetupPrototypeState();
+    Subsystem->ResetLocalServer();
+
+    const bool bJoinRedOk = Subsystem->JoinLocalMatch(MatchId, RedPlayerId);
+    const bool bJoinBlackOk = Subsystem->JoinLocalMatch(MatchId, BlackPlayerId);
+    PullBothSides();
+
+    SetupStandardPlacementsRed = Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Red);
+    SetupStandardPlacementsBlack = Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Black);
+    SetupPendingPlacementsRed.Reset();
+    SetupPendingPlacementsBlack.Reset();
+    SetupPendingPlacementsRed.Reserve(SetupStandardPlacementsRed.Num());
+    SetupPendingPlacementsBlack.Reserve(SetupStandardPlacementsBlack.Num());
+    SetupActiveSide = EStupidChessSide::Red;
+    SetupNextPlacementIndexRed = 0;
+    SetupNextPlacementIndexBlack = 0;
+    bSetupPrototypeActive = bJoinRedOk && bJoinBlackOk && SetupStandardPlacementsRed.Num() == 16 && SetupStandardPlacementsBlack.Num() == 16;
+    bSetupPrototypeReadyToSubmit = false;
+
+    SetPrototypeStatus(FString::Printf(
+        TEXT("[SetupBootstrap] Join(R/B)=%s/%s Slots(R/B)=%d/%d"),
+        bJoinRedOk ? TEXT("OK") : TEXT("Fail"),
+        bJoinBlackOk ? TEXT("OK") : TEXT("Fail"),
+        SetupStandardPlacementsRed.Num(),
+        SetupStandardPlacementsBlack.Num()));
+    RefreshSetupSelectionStatus();
+    RefreshBoardCells();
+}
+
+void UStupidChessBattlePrototypeWidget::SubmitSetupPrototypeReveal()
+{
+    if (!bSetupPrototypeActive)
+    {
+        SetPrototypeStatus(TEXT("[SetupSubmit] Setup mode inactive"));
+        return;
+    }
+
+    if (!bSetupPrototypeReadyToSubmit)
+    {
+        SetPrototypeStatus(TEXT("[SetupSubmit] Placements incomplete"));
+        RefreshSetupSelectionStatus();
+        return;
+    }
+
+    UStupidChessLocalMatchSubsystem* Subsystem = GetLocalSubsystem();
+    if (Subsystem == nullptr)
+    {
+        SetPrototypeStatus(TEXT("[SetupSubmit] Local subsystem unavailable"));
+        return;
+    }
+
+    const bool bCommitRedOk = Subsystem->SubmitCommitSetup(MatchId, RedPlayerId, EStupidChessSide::Red, TEXT(""));
+    const bool bCommitBlackOk = Subsystem->SubmitCommitSetup(MatchId, BlackPlayerId, EStupidChessSide::Black, TEXT(""));
+    CacheSurfaceRolesFromPlacements(EStupidChessSide::Red, SetupPendingPlacementsRed);
+    CacheSurfaceRolesFromPlacements(EStupidChessSide::Black, SetupPendingPlacementsBlack);
+    const bool bRevealRedOk = Subsystem->SubmitRevealSetup(MatchId, RedPlayerId, EStupidChessSide::Red, TEXT("R"), SetupPendingPlacementsRed);
+    const bool bRevealBlackOk = Subsystem->SubmitRevealSetup(MatchId, BlackPlayerId, EStupidChessSide::Black, TEXT("B"), SetupPendingPlacementsBlack);
+    PullBothSides();
+
+    if (bCommitRedOk && bCommitBlackOk && bRevealRedOk && bRevealBlackOk)
+    {
+        bSetupPrototypeActive = false;
+        bSetupPrototypeReadyToSubmit = false;
+    }
+
+    SetPrototypeStatus(FString::Printf(
+        TEXT("[SetupSubmit] Commit(R/B)=%s/%s Reveal(R/B)=%s/%s"),
+        bCommitRedOk ? TEXT("OK") : TEXT("Fail"),
+        bCommitBlackOk ? TEXT("OK") : TEXT("Fail"),
+        bRevealRedOk ? TEXT("OK") : TEXT("Fail"),
+        bRevealBlackOk ? TEXT("OK") : TEXT("Fail")));
+    RefreshSetupSelectionStatus();
+    RefreshBoardCells();
+}
+
+void UStupidChessBattlePrototypeWidget::UndoSetupPrototypePlacement()
+{
+    if (!bSetupPrototypeActive)
+    {
+        SetPrototypeStatus(TEXT("[SetupUndo] Setup mode inactive"));
+        return;
+    }
+
+    if (SetupPlacementHistory.Num() <= 0)
+    {
+        SetPrototypeStatus(TEXT("[SetupUndo] No placement history"));
+        return;
+    }
+
+    const FStupidChessSetupPlacementHistoryEntry LastEntry = SetupPlacementHistory.Last();
+    if (!RemoveLastSetupPlacementForSide(LastEntry.Side, &LastEntry.Placement))
+    {
+        SetPrototypeStatus(TEXT("[SetupUndo] Failed to rollback placement"));
+        return;
+    }
+
+    SetupPlacementHistory.Pop();
+    bSetupPrototypeReadyToSubmit = false;
+    SetupActiveSide = LastEntry.Side;
+
+    SetPrototypeStatus(FString::Printf(
+        TEXT("[SetupUndo] Remove %s P%d from (%d,%d) (%d/%d, %d/%d)"),
+        *SideToDebugLabel(static_cast<int32>(LastEntry.Side)),
+        LastEntry.Placement.PieceId,
+        LastEntry.Placement.X,
+        LastEntry.Placement.Y,
+        SetupPendingPlacementsRed.Num(),
+        SetupStandardPlacementsRed.Num(),
+        SetupPendingPlacementsBlack.Num(),
+        SetupStandardPlacementsBlack.Num()));
+    RefreshSetupSelectionStatus();
+    RefreshBoardCells();
+}
+
 bool UStupidChessBattlePrototypeWidget::BootstrapBattleInternal(bool bUseScrambledSetup)
 {
     UStupidChessLocalMatchSubsystem* Subsystem = GetLocalSubsystem();
@@ -158,15 +282,19 @@ bool UStupidChessBattlePrototypeWidget::BootstrapBattleInternal(bool bUseScrambl
     const bool bJoinBlackOk = Subsystem->JoinLocalMatch(MatchId, BlackPlayerId);
     PullBothSides();
 
+    SetupStandardPlacementsRed = Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Red);
+    SetupStandardPlacementsBlack = Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Black);
     const TArray<FStupidChessSetupPlacement> RedPlacements = bUseScrambledSetup
         ? BuildScrambledSetupPlacements(EStupidChessSide::Red)
-        : Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Red);
+        : SetupStandardPlacementsRed;
     const TArray<FStupidChessSetupPlacement> BlackPlacements = bUseScrambledSetup
         ? BuildScrambledSetupPlacements(EStupidChessSide::Black)
-        : Subsystem->BuildStandardSetupPlacements(EStupidChessSide::Black);
+        : SetupStandardPlacementsBlack;
 
     const bool bCommitRedOk = Subsystem->SubmitCommitSetup(MatchId, RedPlayerId, EStupidChessSide::Red, TEXT(""));
     const bool bCommitBlackOk = Subsystem->SubmitCommitSetup(MatchId, BlackPlayerId, EStupidChessSide::Black, TEXT(""));
+    CacheSurfaceRolesFromPlacements(EStupidChessSide::Red, RedPlacements);
+    CacheSurfaceRolesFromPlacements(EStupidChessSide::Black, BlackPlacements);
     const bool bRevealRedOk = Subsystem->SubmitRevealSetup(MatchId, RedPlayerId, EStupidChessSide::Red, TEXT("R"), RedPlacements);
     const bool bRevealBlackOk = Subsystem->SubmitRevealSetup(MatchId, BlackPlayerId, EStupidChessSide::Black, TEXT("B"), BlackPlacements);
     PullBothSides();
@@ -194,6 +322,7 @@ void UStupidChessBattlePrototypeWidget::PullBothSides()
 
     const int32 RedParsed = Subsystem->PullParseAndDispatchOutboundMessagesIncremental(RedPlayerId);
     const int32 BlackParsed = Subsystem->PullParseAndDispatchOutboundMessagesIncremental(BlackPlayerId);
+    ApplyDisplayedViewerSnapshotIfAvailable();
     SetPrototypeStatus(FString::Printf(TEXT("[Pull] Parsed Red=%d Black=%d"), RedParsed, BlackParsed));
 }
 
@@ -241,8 +370,13 @@ void UStupidChessBattlePrototypeWidget::SubmitBlackResign()
 
 void UStupidChessBattlePrototypeWidget::ResetPrototypeStateOnly()
 {
+    ResetSetupPrototypeState();
     bHasLiveSnapshot = false;
     LiveSnapshot = FStupidChessSnapshotView{};
+    bHasSnapshotForViewer[0] = false;
+    bHasSnapshotForViewer[1] = false;
+    SnapshotByViewer[0] = FStupidChessSnapshotView{};
+    SnapshotByViewer[1] = FStupidChessSnapshotView{};
     AckStatusText = TEXT("[CommandAck] <none>");
     EventDeltaStatusText = TEXT("[EventDelta] <none>");
     GameOverStatusText = TEXT("[GameOver] <none>");
@@ -251,8 +385,35 @@ void UStupidChessBattlePrototypeWidget::ResetPrototypeStateOnly()
     RefreshAllUi();
 }
 
+void UStupidChessBattlePrototypeWidget::ShowRedPlayerView()
+{
+    DisplayViewerSide = EStupidChessSide::Red;
+    ApplyDisplayedViewerSnapshotIfAvailable();
+    SetPrototypeStatus(TEXT("[View] Display viewer = Red"));
+}
+
+void UStupidChessBattlePrototypeWidget::ShowBlackPlayerView()
+{
+    DisplayViewerSide = EStupidChessSide::Black;
+    ApplyDisplayedViewerSnapshotIfAvailable();
+    SetPrototypeStatus(TEXT("[View] Display viewer = Black"));
+}
+
+void UStupidChessBattlePrototypeWidget::ToggleStrictPlayerView()
+{
+    bStrictPlayerView = !bStrictPlayerView;
+    RefreshAllUi();
+    SetPrototypeStatus(FString::Printf(TEXT("[View] StrictPlayerView=%s"), bStrictPlayerView ? TEXT("true") : TEXT("false")));
+}
+
 void UStupidChessBattlePrototypeWidget::HandleBoardCellClicked(int32 X, int32 Y)
 {
+    if (bSetupPrototypeActive)
+    {
+        HandleSetupBoardCellClicked(X, Y);
+        return;
+    }
+
     if (!bHasLiveSnapshot)
     {
         SetPrototypeStatus(TEXT("[CellClick] No live snapshot yet"));
@@ -322,6 +483,36 @@ void UStupidChessBattlePrototypeWidget::HandleBootstrapScrambledButtonClicked()
     BootstrapScrambledBattlePrototypeMatch();
 }
 
+void UStupidChessBattlePrototypeWidget::HandleBootstrapSetupButtonClicked()
+{
+    BootstrapSetupPrototypeMatch();
+}
+
+void UStupidChessBattlePrototypeWidget::HandleSubmitSetupButtonClicked()
+{
+    SubmitSetupPrototypeReveal();
+}
+
+void UStupidChessBattlePrototypeWidget::HandleUndoSetupButtonClicked()
+{
+    UndoSetupPrototypePlacement();
+}
+
+void UStupidChessBattlePrototypeWidget::HandleShowRedViewButtonClicked()
+{
+    ShowRedPlayerView();
+}
+
+void UStupidChessBattlePrototypeWidget::HandleShowBlackViewButtonClicked()
+{
+    ShowBlackPlayerView();
+}
+
+void UStupidChessBattlePrototypeWidget::HandleToggleStrictViewButtonClicked()
+{
+    ToggleStrictPlayerView();
+}
+
 void UStupidChessBattlePrototypeWidget::HandlePassButtonClicked()
 {
     SubmitCurrentTurnPass();
@@ -358,8 +549,16 @@ void UStupidChessBattlePrototypeWidget::HandleErrorParsed(const FStupidChessErro
 
 void UStupidChessBattlePrototypeWidget::HandleSnapshotParsed(const FStupidChessSnapshotView& Snapshot)
 {
-    LiveSnapshot = Snapshot;
-    bHasLiveSnapshot = true;
+    if (Snapshot.ViewerSide == 0 || Snapshot.ViewerSide == 1)
+    {
+        SnapshotByViewer[Snapshot.ViewerSide] = Snapshot;
+        bHasSnapshotForViewer[Snapshot.ViewerSide] = true;
+    }
+    if (Snapshot.ViewerSide == static_cast<int32>(DisplayViewerSide) || !bHasLiveSnapshot)
+    {
+        LiveSnapshot = Snapshot;
+        bHasLiveSnapshot = true;
+    }
     RefreshAllUi();
 }
 
@@ -442,6 +641,36 @@ void UStupidChessBattlePrototypeWidget::BuildRuntimeWidgetTreeIfNeeded()
         TEXT("BtnBootstrapScrambled"),
         TEXT("TxtBtnBootstrapScrambled"),
         TEXT("Bootstrap Scrambled"));
+    BtnBootstrapSetup = CreateNamedButtonWithLabel(
+        WidgetTree,
+        TEXT("BtnBootstrapSetup"),
+        TEXT("TxtBtnBootstrapSetup"),
+        TEXT("Bootstrap Setup"));
+    BtnSubmitSetup = CreateNamedButtonWithLabel(
+        WidgetTree,
+        TEXT("BtnSubmitSetup"),
+        TEXT("TxtBtnSubmitSetup"),
+        TEXT("Submit Setup"));
+    BtnUndoSetup = CreateNamedButtonWithLabel(
+        WidgetTree,
+        TEXT("BtnUndoSetup"),
+        TEXT("TxtBtnUndoSetup"),
+        TEXT("Undo Setup"));
+    BtnShowRedView = CreateNamedButtonWithLabel(
+        WidgetTree,
+        TEXT("BtnShowRedView"),
+        TEXT("TxtBtnShowRedView"),
+        TEXT("Show Red View"));
+    BtnShowBlackView = CreateNamedButtonWithLabel(
+        WidgetTree,
+        TEXT("BtnShowBlackView"),
+        TEXT("TxtBtnShowBlackView"),
+        TEXT("Show Black View"));
+    BtnToggleStrictView = CreateNamedButtonWithLabel(
+        WidgetTree,
+        TEXT("BtnToggleStrictView"),
+        TEXT("TxtBtnToggleStrictView"),
+        TEXT("Toggle Strict View"));
     BtnPull = CreateNamedButtonWithLabel(WidgetTree, TEXT("BtnPull"), TEXT("TxtBtnPull"), TEXT("Pull Both"));
     BtnPass = CreateNamedButtonWithLabel(WidgetTree, TEXT("BtnPass"), TEXT("TxtBtnPass"), TEXT("Pass Current"));
     BtnBlackResign = CreateNamedButtonWithLabel(WidgetTree, TEXT("BtnBlackResign"), TEXT("TxtBtnBlackResign"), TEXT("Black Resign"));
@@ -460,17 +689,23 @@ void UStupidChessBattlePrototypeWidget::BuildRuntimeWidgetTreeIfNeeded()
             }
         };
 
+        AddToSide(BtnBootstrap);
+        AddToSide(BtnBootstrapScrambled);
+        AddToSide(BtnBootstrapSetup);
+        AddToSide(BtnSubmitSetup);
+        AddToSide(BtnUndoSetup);
+        AddToSide(BtnShowRedView);
+        AddToSide(BtnShowBlackView);
+        AddToSide(BtnToggleStrictView);
+        AddToSide(BtnPull, 10.0f);
+        AddToSide(BtnPass);
+        AddToSide(BtnBlackResign, 12.0f);
         AddToSide(TxtStatus);
         AddToSide(TxtSelection);
         AddToSide(TxtSnapshot);
         AddToSide(TxtEventDelta);
         AddToSide(TxtAck);
         AddToSide(TxtGameOver, 12.0f);
-        AddToSide(BtnBootstrap);
-        AddToSide(BtnBootstrapScrambled);
-        AddToSide(BtnPull);
-        AddToSide(BtnPass);
-        AddToSide(BtnBlackResign);
     }
 
     BuildBoardCells();
@@ -543,6 +778,30 @@ void UStupidChessBattlePrototypeWidget::BindUiButtonEvents()
     {
         BtnBootstrapScrambled->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandleBootstrapScrambledButtonClicked);
     }
+    if (BtnBootstrapSetup != nullptr)
+    {
+        BtnBootstrapSetup->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandleBootstrapSetupButtonClicked);
+    }
+    if (BtnSubmitSetup != nullptr)
+    {
+        BtnSubmitSetup->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandleSubmitSetupButtonClicked);
+    }
+    if (BtnUndoSetup != nullptr)
+    {
+        BtnUndoSetup->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandleUndoSetupButtonClicked);
+    }
+    if (BtnShowRedView != nullptr)
+    {
+        BtnShowRedView->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandleShowRedViewButtonClicked);
+    }
+    if (BtnShowBlackView != nullptr)
+    {
+        BtnShowBlackView->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandleShowBlackViewButtonClicked);
+    }
+    if (BtnToggleStrictView != nullptr)
+    {
+        BtnToggleStrictView->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandleToggleStrictViewButtonClicked);
+    }
     if (BtnPass != nullptr)
     {
         BtnPass->OnClicked.AddDynamic(this, &UStupidChessBattlePrototypeWidget::HandlePassButtonClicked);
@@ -604,6 +863,24 @@ void UStupidChessBattlePrototypeWidget::RefreshAllUi()
     RefreshStatusTexts();
 }
 
+void UStupidChessBattlePrototypeWidget::ApplyDisplayedViewerSnapshotIfAvailable()
+{
+    const int32 ViewerIndex = static_cast<int32>(DisplayViewerSide);
+    if (ViewerIndex < 0 || ViewerIndex > 1)
+    {
+        return;
+    }
+
+    if (!bHasSnapshotForViewer[ViewerIndex])
+    {
+        return;
+    }
+
+    LiveSnapshot = SnapshotByViewer[ViewerIndex];
+    bHasLiveSnapshot = true;
+    RefreshAllUi();
+}
+
 void UStupidChessBattlePrototypeWidget::RefreshBoardCells()
 {
     for (int32 Y = 0; Y < BoardHeight; ++Y)
@@ -619,20 +896,44 @@ void UStupidChessBattlePrototypeWidget::RefreshBoardCells()
             }
 
             const bool bSelected = bHasSelection && SelectedBoardCell.X == X && SelectedBoardCell.Y == Y;
-            const FStupidChessPieceSnapshot* Piece = bHasLiveSnapshot ? FindLivePieceAt(X, Y) : nullptr;
-            CellLabel->SetText(FText::FromString(MakeCellLabelText(Piece, bSelected)));
+            const FStupidChessPieceSnapshot* Piece = (!bSetupPrototypeActive && bHasLiveSnapshot) ? FindLivePieceAt(X, Y) : nullptr;
+            FStupidChessSetupPlacement SetupPlacement{};
+            int32 SetupSide = -1;
+            const bool bHasSetupPreviewPiece = bSetupPrototypeActive && TryFindSetupPreviewPieceAt(X, Y, SetupPlacement, SetupSide);
+            if (bHasSetupPreviewPiece)
+            {
+                CellLabel->SetText(FText::FromString(MakeSetupCellLabelText(SetupPlacement, SetupSide, bSelected)));
+            }
+            else
+            {
+                CellLabel->SetText(FText::FromString(MakeCellLabelText(Piece, bSelected)));
+            }
 
             FLinearColor CellColor = FLinearColor(0.84f, 0.84f, 0.84f);
             if ((X + Y) % 2 == 0)
             {
                 CellColor = FLinearColor(0.92f, 0.92f, 0.92f);
             }
-            if (Piece != nullptr)
+            if (bHasSetupPreviewPiece)
+            {
+                CellColor = (SetupSide == 0) ? FLinearColor(0.96f, 0.70f, 0.70f) : FLinearColor(0.72f, 0.78f, 0.96f);
+            }
+            else if (Piece != nullptr)
             {
                 CellColor = Piece->Side == 0 ? FLinearColor(0.96f, 0.70f, 0.70f) : FLinearColor(0.72f, 0.78f, 0.96f);
                 if (Piece->bFrozen)
                 {
                     CellColor *= 0.7f;
+                }
+            }
+            if (bSetupPrototypeActive && !bHasSetupPreviewPiece)
+            {
+                EStupidChessSide ActiveSetupSide = EStupidChessSide::Red;
+                if (TryGetSetupActiveSide(ActiveSetupSide) && IsValidSetupSlot(ActiveSetupSide, X, Y))
+                {
+                    CellColor = (ActiveSetupSide == EStupidChessSide::Red)
+                        ? FLinearColor(1.0f, 0.85f, 0.85f)
+                        : FLinearColor(0.84f, 0.89f, 1.0f);
                 }
             }
             if (bSelected)
@@ -648,7 +949,11 @@ void UStupidChessBattlePrototypeWidget::RefreshStatusTexts()
 {
     if (TxtStatus != nullptr)
     {
-        TxtStatus->SetText(FText::FromString(PrototypeStatusText));
+        TxtStatus->SetText(FText::FromString(FString::Printf(
+            TEXT("%s\n[View] %s | Strict=%s"),
+            *PrototypeStatusText,
+            *SideToDebugLabel(static_cast<int32>(DisplayViewerSide)),
+            bStrictPlayerView ? TEXT("On") : TEXT("Off"))));
     }
     if (TxtSelection != nullptr)
     {
@@ -685,6 +990,15 @@ void UStupidChessBattlePrototypeWidget::RefreshStatusTexts()
     {
         TxtGameOver->SetText(FText::FromString(GameOverStatusText));
     }
+
+    if (BtnSubmitSetup != nullptr)
+    {
+        BtnSubmitSetup->SetIsEnabled(bSetupPrototypeActive && bSetupPrototypeReadyToSubmit);
+    }
+    if (BtnUndoSetup != nullptr)
+    {
+        BtnUndoSetup->SetIsEnabled(bSetupPrototypeActive && SetupPlacementHistory.Num() > 0);
+    }
 }
 
 void UStupidChessBattlePrototypeWidget::ClearSelection()
@@ -692,6 +1006,309 @@ void UStupidChessBattlePrototypeWidget::ClearSelection()
     bHasSelection = false;
     SelectedBoardCell = FIntPoint(-1, -1);
     SetSelectionStatus(TEXT("[Select] <none>"));
+}
+
+void UStupidChessBattlePrototypeWidget::ResetSetupPrototypeState()
+{
+    bSetupPrototypeActive = false;
+    bSetupPrototypeReadyToSubmit = false;
+    SetupActiveSide = EStupidChessSide::Red;
+    SetupNextPlacementIndexRed = 0;
+    SetupNextPlacementIndexBlack = 0;
+    SetupStandardPlacementsRed.Reset();
+    SetupStandardPlacementsBlack.Reset();
+    SetupPendingPlacementsRed.Reset();
+    SetupPendingPlacementsBlack.Reset();
+    SetupPlacementHistory.Reset();
+    PieceSurfaceRoleTypeByPieceId.Reset();
+}
+
+void UStupidChessBattlePrototypeWidget::RefreshSetupSelectionStatus()
+{
+    if (!bSetupPrototypeActive)
+    {
+        return;
+    }
+
+    if (bSetupPrototypeReadyToSubmit)
+    {
+        SetSelectionStatus(TEXT("[Setup] Ready to submit (Commit/Reveal)"));
+        return;
+    }
+
+    EStupidChessSide ActiveSide = EStupidChessSide::Red;
+    if (!TryGetSetupActiveSide(ActiveSide))
+    {
+        SetSelectionStatus(TEXT("[Setup] Internal state invalid"));
+        return;
+    }
+
+    const TArray<FStupidChessSetupPlacement>& StandardPlacements =
+        (ActiveSide == EStupidChessSide::Red) ? SetupStandardPlacementsRed : SetupStandardPlacementsBlack;
+    const int32 NextIndex = (ActiveSide == EStupidChessSide::Red) ? SetupNextPlacementIndexRed : SetupNextPlacementIndexBlack;
+    if (!StandardPlacements.IsValidIndex(NextIndex))
+    {
+        SetSelectionStatus(TEXT("[Setup] Ready to submit (Commit/Reveal)"));
+        return;
+    }
+
+    const int32 PieceId = StandardPlacements[NextIndex].PieceId;
+    const int32 ActualRole = GetActualRoleTypeFromPieceIdForPrototype(PieceId);
+    const FString SideLabel = SideToDebugLabel(static_cast<int32>(ActiveSide));
+    const FString ActualRoleLabel = RoleTypeToChineseLabel(static_cast<int32>(ActiveSide), ActualRole);
+    SetSelectionStatus(FString::Printf(
+        TEXT("[Setup] %s #%d P%d %s -> click legal start slot"),
+        *SideLabel,
+        NextIndex + 1,
+        PieceId,
+        *ActualRoleLabel));
+}
+
+bool UStupidChessBattlePrototypeWidget::HandleSetupBoardCellClicked(int32 X, int32 Y)
+{
+    if (!bSetupPrototypeActive)
+    {
+        return false;
+    }
+
+    EStupidChessSide ActiveSide = EStupidChessSide::Red;
+    if (!TryGetSetupActiveSide(ActiveSide))
+    {
+        SetPrototypeStatus(TEXT("[Setup] Invalid active side"));
+        RefreshSetupSelectionStatus();
+        return false;
+    }
+
+    const TArray<FStupidChessSetupPlacement>& StandardPlacements =
+        (ActiveSide == EStupidChessSide::Red) ? SetupStandardPlacementsRed : SetupStandardPlacementsBlack;
+    TArray<FStupidChessSetupPlacement>& PendingPlacements =
+        (ActiveSide == EStupidChessSide::Red) ? SetupPendingPlacementsRed : SetupPendingPlacementsBlack;
+    int32& NextIndex = (ActiveSide == EStupidChessSide::Red) ? SetupNextPlacementIndexRed : SetupNextPlacementIndexBlack;
+
+    if (!StandardPlacements.IsValidIndex(NextIndex))
+    {
+        SetPrototypeStatus(TEXT("[Setup] Side complete, switch/submit"));
+        RefreshSetupSelectionStatus();
+        return false;
+    }
+
+    if (!IsValidSetupSlot(ActiveSide, X, Y))
+    {
+        SetPrototypeStatus(FString::Printf(
+            TEXT("[Setup] %s invalid slot (%d,%d)"),
+            *SideToDebugLabel(static_cast<int32>(ActiveSide)),
+            X,
+            Y));
+        return false;
+    }
+
+    if (IsSetupCellOccupied(ActiveSide, X, Y))
+    {
+        SetPrototypeStatus(FString::Printf(
+            TEXT("[Setup] %s slot occupied (%d,%d)"),
+            *SideToDebugLabel(static_cast<int32>(ActiveSide)),
+            X,
+            Y));
+        return false;
+    }
+
+    FStupidChessSetupPlacement Placement = StandardPlacements[NextIndex];
+    Placement.X = X;
+    Placement.Y = Y;
+    PendingPlacements.Add(Placement);
+    FStupidChessSetupPlacementHistoryEntry& HistoryEntry = SetupPlacementHistory.AddDefaulted_GetRef();
+    HistoryEntry.Side = ActiveSide;
+    HistoryEntry.Placement = Placement;
+    ++NextIndex;
+
+    if (SetupNextPlacementIndexRed >= SetupStandardPlacementsRed.Num() && SetupNextPlacementIndexBlack >= SetupStandardPlacementsBlack.Num())
+    {
+        bSetupPrototypeReadyToSubmit = true;
+    }
+    else if (ActiveSide == EStupidChessSide::Red && SetupNextPlacementIndexRed >= SetupStandardPlacementsRed.Num())
+    {
+        SetupActiveSide = EStupidChessSide::Black;
+    }
+    else if (ActiveSide == EStupidChessSide::Black && SetupNextPlacementIndexBlack >= SetupStandardPlacementsBlack.Num())
+    {
+        SetupActiveSide = EStupidChessSide::Red;
+    }
+
+    SetPrototypeStatus(FString::Printf(
+        TEXT("[Setup] Place %s P%d -> (%d,%d) (%d/%d, %d/%d)"),
+        *SideToDebugLabel(static_cast<int32>(ActiveSide)),
+        Placement.PieceId,
+        X,
+        Y,
+        SetupPendingPlacementsRed.Num(),
+        SetupStandardPlacementsRed.Num(),
+        SetupPendingPlacementsBlack.Num(),
+        SetupStandardPlacementsBlack.Num()));
+    RefreshSetupSelectionStatus();
+    RefreshBoardCells();
+    return true;
+}
+
+bool UStupidChessBattlePrototypeWidget::RemoveLastSetupPlacementForSide(
+    EStupidChessSide Side,
+    const FStupidChessSetupPlacement* ExpectedPlacement)
+{
+    TArray<FStupidChessSetupPlacement>& PendingPlacements =
+        (Side == EStupidChessSide::Red) ? SetupPendingPlacementsRed : SetupPendingPlacementsBlack;
+    int32& NextIndex = (Side == EStupidChessSide::Red) ? SetupNextPlacementIndexRed : SetupNextPlacementIndexBlack;
+
+    if (PendingPlacements.Num() <= 0 || NextIndex <= 0)
+    {
+        return false;
+    }
+
+    const int32 LastIndex = PendingPlacements.Num() - 1;
+    if (ExpectedPlacement != nullptr)
+    {
+        const FStupidChessSetupPlacement& CurrentLast = PendingPlacements[LastIndex];
+        if (CurrentLast.PieceId != ExpectedPlacement->PieceId || CurrentLast.X != ExpectedPlacement->X || CurrentLast.Y != ExpectedPlacement->Y)
+        {
+            return false;
+        }
+    }
+
+    PendingPlacements.RemoveAt(LastIndex);
+    NextIndex = FMath::Max(0, NextIndex - 1);
+    return true;
+}
+
+bool UStupidChessBattlePrototypeWidget::TryGetSetupActiveSide(EStupidChessSide& OutSide) const
+{
+    if (!bSetupPrototypeActive)
+    {
+        return false;
+    }
+
+    if (bSetupPrototypeReadyToSubmit)
+    {
+        OutSide = SetupActiveSide;
+        return true;
+    }
+
+    if (SetupNextPlacementIndexRed < SetupStandardPlacementsRed.Num())
+    {
+        OutSide = EStupidChessSide::Red;
+        if (SetupActiveSide == EStupidChessSide::Black && SetupNextPlacementIndexBlack < SetupStandardPlacementsBlack.Num())
+        {
+            OutSide = EStupidChessSide::Black;
+        }
+        return true;
+    }
+    if (SetupNextPlacementIndexBlack < SetupStandardPlacementsBlack.Num())
+    {
+        OutSide = EStupidChessSide::Black;
+        return true;
+    }
+    return false;
+}
+
+bool UStupidChessBattlePrototypeWidget::TryFindSetupPreviewPieceAt(int32 X, int32 Y, FStupidChessSetupPlacement& OutPlacement, int32& OutSide) const
+{
+    for (const FStupidChessSetupPlacement& Placement : SetupPendingPlacementsRed)
+    {
+        if (Placement.X == X && Placement.Y == Y)
+        {
+            OutPlacement = Placement;
+            OutSide = 0;
+            return true;
+        }
+    }
+    for (const FStupidChessSetupPlacement& Placement : SetupPendingPlacementsBlack)
+    {
+        if (Placement.X == X && Placement.Y == Y)
+        {
+            OutPlacement = Placement;
+            OutSide = 1;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UStupidChessBattlePrototypeWidget::IsValidSetupSlot(EStupidChessSide Side, int32 X, int32 Y) const
+{
+    const TArray<FStupidChessSetupPlacement>& StandardPlacements =
+        (Side == EStupidChessSide::Red) ? SetupStandardPlacementsRed : SetupStandardPlacementsBlack;
+    for (const FStupidChessSetupPlacement& Placement : StandardPlacements)
+    {
+        if (Placement.X == X && Placement.Y == Y)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UStupidChessBattlePrototypeWidget::IsSetupCellOccupied(EStupidChessSide Side, int32 X, int32 Y) const
+{
+    const TArray<FStupidChessSetupPlacement>& PendingPlacements =
+        (Side == EStupidChessSide::Red) ? SetupPendingPlacementsRed : SetupPendingPlacementsBlack;
+    for (const FStupidChessSetupPlacement& Placement : PendingPlacements)
+    {
+        if (Placement.X == X && Placement.Y == Y)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+int32 UStupidChessBattlePrototypeWidget::GetSetupSlotVisibleRole(EStupidChessSide Side, int32 X, int32 Y) const
+{
+    const TArray<FStupidChessSetupPlacement>& StandardPlacements =
+        (Side == EStupidChessSide::Red) ? SetupStandardPlacementsRed : SetupStandardPlacementsBlack;
+    for (const FStupidChessSetupPlacement& Placement : StandardPlacements)
+    {
+        if (Placement.X == X && Placement.Y == Y)
+        {
+            return GetActualRoleTypeFromPieceIdForPrototype(Placement.PieceId);
+        }
+    }
+    return -1;
+}
+
+void UStupidChessBattlePrototypeWidget::CacheSurfaceRolesFromPlacements(
+    EStupidChessSide Side,
+    const TArray<FStupidChessSetupPlacement>& Placements)
+{
+    for (const FStupidChessSetupPlacement& Placement : Placements)
+    {
+        const int32 SurfaceRoleType = GetSetupSlotVisibleRole(Side, Placement.X, Placement.Y);
+        if (SurfaceRoleType >= 0)
+        {
+            PieceSurfaceRoleTypeByPieceId.Add(Placement.PieceId, SurfaceRoleType);
+        }
+    }
+}
+
+int32 UStupidChessBattlePrototypeWidget::GetCachedSurfaceRoleTypeForPiece(int32 PieceId, int32 Side) const
+{
+    if (const int32* CachedRoleType = PieceSurfaceRoleTypeByPieceId.Find(PieceId))
+    {
+        return *CachedRoleType;
+    }
+
+    return GetActualRoleTypeFromPieceIdForPrototype(PieceId);
+}
+
+FString UStupidChessBattlePrototypeWidget::MakeSetupCellLabelText(const FStupidChessSetupPlacement& Placement, int32 Side, bool bSelected) const
+{
+    const FString SidePrefix = Side == 0 ? TEXT("R") : TEXT("B");
+    const int32 VisibleRole = GetSetupSlotVisibleRole(static_cast<EStupidChessSide>(Side), Placement.X, Placement.Y);
+    const int32 ActualRole = GetActualRoleTypeFromPieceIdForPrototype(Placement.PieceId);
+    const FString VisibleLabel = RoleTypeToChineseLabel(Side, VisibleRole);
+    const FString ActualLabel = RoleTypeToChineseLabel(Side, ActualRole);
+    FString BaseText = FString::Printf(TEXT("%s%d\n%s/%s 设"), *SidePrefix, Placement.PieceId, *VisibleLabel, *ActualLabel);
+    if (bSelected)
+    {
+        BaseText = FString::Printf(TEXT("[%s]"), *BaseText);
+    }
+    return BaseText;
 }
 
 bool UStupidChessBattlePrototypeWidget::TrySubmitMoveFromSelection(int32 ToX, int32 ToY)
@@ -801,13 +1418,14 @@ const FStupidChessPieceSnapshot* UStupidChessBattlePrototypeWidget::FindLivePiec
     return nullptr;
 }
 
-FString UStupidChessBattlePrototypeWidget::MakeCellLabelText(const FStupidChessPieceSnapshot* Piece, bool bSelected)
+FString UStupidChessBattlePrototypeWidget::MakeCellLabelText(const FStupidChessPieceSnapshot* Piece, bool bSelected) const
 {
     FString BaseText = TEXT(".");
     if (Piece != nullptr)
     {
         const FString SidePrefix = Piece->Side == 0 ? TEXT("R") : TEXT("B");
-        const FString VisibleRoleLabel = RoleTypeToChineseLabel(Piece->Side, Piece->VisibleRole);
+        const int32 SurfaceRoleType = GetCachedSurfaceRoleTypeForPiece(Piece->PieceId, Piece->Side);
+        const FString SurfaceRoleLabel = RoleTypeToChineseLabel(Piece->Side, SurfaceRoleType);
         const int32 ActualRoleType = GetActualRoleTypeFromPieceIdForPrototype(Piece->PieceId);
         const FString ActualRoleLabel = RoleTypeToChineseLabel(Piece->Side, ActualRoleType);
         FString Flags;
@@ -828,7 +1446,12 @@ FString UStupidChessBattlePrototypeWidget::MakeCellLabelText(const FStupidChessP
             Flags = TEXT("-");
         }
 
-        const FString RoleText = FString::Printf(TEXT("%s/%s"), *VisibleRoleLabel, *ActualRoleLabel);
+        const bool bIsOwnPieceForDisplayedViewer = Piece->Side == static_cast<int32>(DisplayViewerSide);
+        const bool bCanSeeActualRoleInStrictView = bIsOwnPieceForDisplayedViewer || Piece->bRevealed;
+        const FString ActualRoleForDisplay = (!bStrictPlayerView || bCanSeeActualRoleInStrictView)
+            ? ActualRoleLabel
+            : TEXT("？");
+        const FString RoleText = FString::Printf(TEXT("%s/%s"), *SurfaceRoleLabel, *ActualRoleForDisplay);
 
         BaseText = FString::Printf(
             TEXT("%s%d\n%s %s"),
