@@ -66,6 +66,33 @@ int32 GetActualRoleTypeFromPieceIdForPrototype(int32 PieceId)
     }
 }
 
+int32 GetSurfaceRoleTypeForSetupSlotCoordinate(EStupidChessSide Side, int32 X, int32 Y)
+{
+    // Canonical setup-slot template matches UStupidChessLocalMatchSubsystem::StandardSetupSlots
+    // for Red. Black uses Y-mirror in BuildStandardSetupPlacements().
+    struct FCanonicalSetupSlot
+    {
+        int32 X;
+        int32 Y;
+    };
+    static constexpr FCanonicalSetupSlot CanonicalRedSetupSlots[16] = {
+        {0, 0}, {1, 0}, {2, 0}, {3, 0},
+        {4, 0}, {5, 0}, {6, 0}, {7, 0},
+        {8, 0}, {1, 2}, {7, 2}, {0, 3},
+        {2, 3}, {4, 3}, {6, 3}, {8, 3}};
+
+    const int32 CanonicalY = (Side == EStupidChessSide::Black) ? (9 - Y) : Y;
+    for (int32 LocalIndex = 0; LocalIndex < 16; ++LocalIndex)
+    {
+        if (CanonicalRedSetupSlots[LocalIndex].X == X && CanonicalRedSetupSlots[LocalIndex].Y == CanonicalY)
+        {
+            return GetActualRoleTypeFromPieceIdForPrototype(LocalIndex);
+        }
+    }
+
+    return -1;
+}
+
 FString RoleTypeToChineseLabel(int32 Side, int32 RoleType)
 {
     const bool bRed = (Side == 0);
@@ -1260,16 +1287,7 @@ bool UStupidChessBattlePrototypeWidget::IsSetupCellOccupied(EStupidChessSide Sid
 
 int32 UStupidChessBattlePrototypeWidget::GetSetupSlotVisibleRole(EStupidChessSide Side, int32 X, int32 Y) const
 {
-    const TArray<FStupidChessSetupPlacement>& StandardPlacements =
-        (Side == EStupidChessSide::Red) ? SetupStandardPlacementsRed : SetupStandardPlacementsBlack;
-    for (const FStupidChessSetupPlacement& Placement : StandardPlacements)
-    {
-        if (Placement.X == X && Placement.Y == Y)
-        {
-            return GetActualRoleTypeFromPieceIdForPrototype(Placement.PieceId);
-        }
-    }
-    return -1;
+    return GetSurfaceRoleTypeForSetupSlotCoordinate(Side, X, Y);
 }
 
 void UStupidChessBattlePrototypeWidget::CacheSurfaceRolesFromPlacements(
